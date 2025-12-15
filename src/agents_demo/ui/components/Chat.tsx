@@ -10,9 +10,20 @@ interface ChatProps {
   onSendMessage: (message: string) => void;
   /** Whether waiting for assistant response */
   isLoading?: boolean;
+  conversationId?: string;
+  onFeedback?: (
+    messageId: string,
+    traceId: string | undefined,
+    positive: boolean
+  ) => void;
 }
 
-export function Chat({ messages, onSendMessage, isLoading }: ChatProps) {
+export function Chat({
+  messages,
+  onSendMessage,
+  isLoading,
+  onFeedback,
+}: ChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [inputText, setInputText] = useState("");
   const [isComposing, setIsComposing] = useState(false);
@@ -73,7 +84,7 @@ export function Chat({ messages, onSendMessage, isLoading }: ChatProps) {
           if (msg.content === "DISPLAY_SEAT_MAP") return null; // Skip rendering marker message
           return (
             <div
-              key={idx}
+              key={msg.id ?? idx}
               className={`flex mb-5 text-sm ${msg.role === "user" ? "justify-end" : "justify-start"
                 }`}
             >
@@ -84,6 +95,39 @@ export function Chat({ messages, onSendMessage, isLoading }: ChatProps) {
               ) : (
                 <div className="mr-4 rounded-[16px] rounded-bl-[4px] px-4 py-2 md:mr-24 text-zinc-900 bg-[#ECECF1] font-light max-w-[80%]">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  {msg.agent && (
+                    <div className="text-[11px] text-gray-500 mt-1">via {msg.agent}</div>
+                  )}
+                  {msg.role === "assistant" && onFeedback && (
+                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-600">
+                      <span className="text-[11px]">Feedback:</span>
+                      <button
+                        className={`px-2 py-1 rounded-full border text-[11px] transition ${
+                          msg.feedback === "positive"
+                            ? "bg-green-100 border-green-400 text-green-700"
+                            : "border-gray-300 hover:border-green-500"
+                        }`}
+                        disabled={!msg.traceId || !!msg.feedback}
+                        onClick={() => onFeedback(msg.id, msg.traceId, true)}
+                      >
+                        👍
+                      </button>
+                      <button
+                        className={`px-2 py-1 rounded-full border text-[11px] transition ${
+                          msg.feedback === "negative"
+                            ? "bg-red-100 border-red-400 text-red-700"
+                            : "border-gray-300 hover:border-red-500"
+                        }`}
+                        disabled={!msg.traceId || !!msg.feedback}
+                        onClick={() => onFeedback(msg.id, msg.traceId, false)}
+                      >
+                        👎
+                      </button>
+                      {!msg.traceId && (
+                        <span className="text-[11px] text-gray-400">no trace id</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -1,8 +1,9 @@
 from importlib.resources import files
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
 import time
@@ -18,9 +19,13 @@ from .main_qwen import (
 	flight_status_agent,
 	cancellation_agent,
 	create_initial_context,
+	AirlineAgentContext,
+	food_service_agent,
 )
-from .main_qwen import OpenAIModel as bOpenAIModel # True: use OpenAI model; False: use Qwen model
+from .main_qwen import OpenAIModel as bOpenAIModel  # True: use OpenAI model; False: use Qwen model
 from .main_qwen import myRunConfig
+from .storage import JsonConversationStore
+from .telemetry import Telemetry
 
 
 """
@@ -74,8 +79,12 @@ class ChatRequest(BaseModel):
 
 # agent message response
 class MessageResponse(BaseModel):
+	id: str
 	content: str
 	agent: str
+	trace_id: Optional[str] = None
+	timestamp: float
+	feedback: Optional[float] = None
 
 # agent event log of workflow
 class AgentEvent(BaseModel):
@@ -95,6 +104,14 @@ class GuardrailCheck(BaseModel):
 	passed: bool
 	timestamp: float
 
+
+class FeedbackRequest(BaseModel):
+	conversation_id: str
+	message_id: str
+	trace_id: str
+	score: float
+	comment: Optional[str] = None
+
 #****************************************************************************************************
 # ===================================================================================================
 # Response Model： sending response back to frontend app
@@ -111,38 +128,25 @@ class ChatResponse(BaseModel):
 	events: List[AgentEvent]
 	context: Dict[str, Any]
 	agents: List[Dict[str, Any]]
-	guardrails: List[GuardrailCheck] = []
-
-# =====================================================================
-# In-memory store for conversation state 
-# Session of OpenAI Agent SDK can also be used 
-# In-memory store/session is used for multi-turn conversation 
-# and agent orchestration (workflow), Commented by HCI2025
-# =====================================================================
-
-class ConversationStore:
-	def get(self, conversation_id: str) -> Optional[Dict[str, Any]]:
-		pass
-
-	def save(self, conversation_id: str, state: Dict[str, Any]):
-		pass
-
-class InMemoryConversationStore(ConversationStore):
-#class InMemoryConversationStore():
-	_conversations: Dict[str, Dict[str, Any]] = {}
-
-	def get(self, conversation_id: str) -> Optional[Dict[str, Any]]:
-		return self._conversations.get(conversation_id)
-
-	def save(self, conversation_id: str, state: Dict[str, Any]):
-		self._conversations[conversation_id] = state
+	guardrails: List[GuardrailCheck] = Field(default_factory=list)
+	trace_id: Optional[str] = None
 
 #===================================================================================
-# Global conversation store instance
-# TODO: when deploying this app in scale, switch to production-ready implementation
-#* Your Task: long-term storage like DB, Redis, or use Session of OpenAI Agent SDK
+# Persistent conversation store instance
 #===================================================================================
-conversation_store = InMemoryConversationStore()
+data_dir = Path(__file__).resolve().parent / "data"
+conversation_store = JsonConversationStore(
+	data_dir / "conversations.json",
+	context_loader=lambda payload: AirlineAgentContext(**payload),
+)
+
+#===================================================================================
+# Telemetry for trace logging and feedback forwarding
+#===================================================================================
+telemetry = Telemetry(
+	trace_log=data_dir / "traces.jsonl",
+	feedback_log=data_dir / "feedback.jsonl",
+)
 
 # =========================
 # Helpers
@@ -156,6 +160,7 @@ def _get_agent_by_name(name: str):
 		seat_booking_agent.name: seat_booking_agent,
 		flight_status_agent.name: flight_status_agent,
 		cancellation_agent.name: cancellation_agent,
+		food_service_agent.name: food_service_agent,
 	}
 	return agents.get(name, triage_agent)
 
@@ -188,6 +193,7 @@ def _build_agents_list() -> List[Dict[str, Any]]:
 		make_agent_dict(seat_booking_agent),
 		make_agent_dict(flight_status_agent),
 		make_agent_dict(cancellation_agent),
+		make_agent_dict(food_service_agent),
 	]
 
 # =========================
@@ -196,19 +202,21 @@ def _build_agents_list() -> List[Dict[str, Any]]:
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(req: ChatRequest):
-    
 	print(f"Received chat request: conversation_id={req.conversation_id}, message={req.message} ")
+	trace_id = uuid4().hex
+	now_ms = time.time() * 1000
 	"""
-    Main chat endpoint for agent orchestration.
-    Handles conversation state, agent routing, and guardrail checks.
-    """
+	Main chat endpoint for agent orchestration.
+	Handles conversation state, agent routing, and guardrail checks.
+	"""
 	# Initialize or retrieve conversation state
-	is_new = not req.conversation_id or conversation_store.get(req.conversation_id) is None
+	existing_state = conversation_store.get(req.conversation_id) if req.conversation_id else None
+	is_new = existing_state is None
 	if is_new:
 		conversation_id: str = uuid4().hex
 		ctx = create_initial_context()   #flight booking context
 		current_agent_name = triage_agent.name
-        
+
 		#========================================
 		#     state for first time conversation
 		#========================================
@@ -216,6 +224,8 @@ async def chat_endpoint(req: ChatRequest):
 			"input_items": [], #list of TResponseInputItem for Runner.run
 			"context": ctx,   #flight booking context
 			"current_agent": current_agent_name, #agent to start with
+			"trace_history": [],
+			"feedback": [],
 		}
 		if req.message.strip() == "":
 			conversation_store.save(conversation_id, state)
@@ -227,20 +237,23 @@ async def chat_endpoint(req: ChatRequest):
 				context=ctx.model_dump(),
 				agents=_build_agents_list(),
 				guardrails=[],
+				trace_id=trace_id,
 			)
 	else:
 		conversation_id = req.conversation_id
 		#===============================================
 		#   retrieve state for conversation from store
 		#===============================================
-		state = conversation_store.get(conversation_id)
+		if existing_state is None:
+			raise HTTPException(status_code=404, detail="Conversation not found")
+		state = existing_state
 
 	#=============================================
 	# prepare parameters for Runner
 	#=============================================
 	current_agent = _get_agent_by_name(state["current_agent"])  #pick this agent for running
 	state["input_items"].append({"content": req.message, "role": "user"})   #input for runner.run
-	old_context = state["context"].model_dump().copy()  #context for runner.run
+	old_context = state["context"].model_dump().copy() if hasattr(state["context"], "model_dump") else dict(state["context"])  #context for runner.run
 	guardrail_checks: List[GuardrailCheck] = []
 
 	try:
@@ -272,14 +285,31 @@ async def chat_endpoint(req: ChatRequest):
 			))
 		refusal = "Sorry, I can only answer questions related to airline travel."
 		state["input_items"].append({"role": "assistant", "content": refusal})  # record refusal in conversation history
+		refusal_message = MessageResponse(
+			id=uuid4().hex,
+			content=refusal,
+			agent=current_agent.name,
+			trace_id=trace_id,
+			timestamp=gr_timestamp,
+		)
+		conversation_store.save(conversation_id, state)
+		telemetry.record_trace(
+			trace_id=trace_id,
+			conversation_id=conversation_id,
+			agent=current_agent.name,
+			user_message=req.message,
+			assistant_messages=[refusal_message.model_dump()],
+			guardrails=[gc.model_dump() for gc in guardrail_checks],
+		)
 		return ChatResponse(
 			conversation_id=conversation_id,
 			current_agent=current_agent.name,
-			messages=[MessageResponse(content=refusal, agent=current_agent.name)],
+			messages=[refusal_message],
 			events=[],
-			context=state["context"].model_dump(),
+			context=state["context"].model_dump() if hasattr(state["context"], "model_dump") else state["context"],
 			agents=_build_agents_list(),
 			guardrails=guardrail_checks,
+			trace_id=trace_id,
 		)
     
 	# ===============================
@@ -296,8 +326,26 @@ async def chat_endpoint(req: ChatRequest):
 	for item in result.new_items:
 		if isinstance(item, MessageOutputItem):
 			text = ItemHelpers.text_message_output(item)
-			messages.append(MessageResponse(content=text, agent=item.agent.name))
-			events.append(AgentEvent(id=uuid4().hex, type="message", agent=item.agent.name, content=text))
+			msg_ts = time.time() * 1000
+			msg_id = uuid4().hex
+			messages.append(
+				MessageResponse(
+					id=msg_id,
+					content=text,
+					agent=item.agent.name,
+					trace_id=trace_id,
+					timestamp=msg_ts,
+				)
+			)
+			events.append(
+				AgentEvent(
+					id=uuid4().hex,
+					type="message",
+					agent=item.agent.name,
+					content=text,
+					timestamp=msg_ts,
+				)
+			)
         
 		# Handle handoff output and agent switching
 		elif isinstance(item, HandoffOutputItem):
@@ -309,6 +357,7 @@ async def chat_endpoint(req: ChatRequest):
 					agent=item.source_agent.name,
 					content=f"{item.source_agent.name} -> {item.target_agent.name}",
 					metadata={"source_agent": item.source_agent.name, "target_agent": item.target_agent.name},
+					timestamp=time.time() * 1000,
 				)
 			)
 			# If there is an on_handoff callback defined for this handoff, show it as a tool call
@@ -335,6 +384,7 @@ async def chat_endpoint(req: ChatRequest):
 								type="tool_call",
 								agent=to_agent.name,
 								content=cb_name,
+								timestamp=time.time() * 1000,
 							)
 						)
 			#==========================================================
@@ -359,6 +409,7 @@ async def chat_endpoint(req: ChatRequest):
 					agent=item.agent.name,
 					content=tool_name or "",
 					metadata={"tool_args": tool_args},
+					timestamp=time.time() * 1000,
 				)
 			)
             
@@ -368,8 +419,11 @@ async def chat_endpoint(req: ChatRequest):
 			if tool_name == "display_seat_map":
 				messages.append(
 					MessageResponse(
+						id=uuid4().hex,
 						content="DISPLAY_SEAT_MAP",
 						agent=item.agent.name,
+						trace_id=trace_id,
+						timestamp=time.time() * 1000,
 					)
 				)
 		elif isinstance(item, ToolCallOutputItem):
@@ -380,11 +434,12 @@ async def chat_endpoint(req: ChatRequest):
 					agent=item.agent.name,
 					content=str(item.output),
 					metadata={"tool_result": item.output},
+					timestamp=time.time() * 1000,
 				)
 			)
     
 	# Check for context updates
-	new_context = state["context"].dict()
+	new_context = state["context"].model_dump()
 	changes = {k: new_context[k] for k in new_context if old_context.get(k) != new_context[k]}
 	if changes:
 		events.append(
@@ -394,6 +449,7 @@ async def chat_endpoint(req: ChatRequest):
 				agent=current_agent.name,
 				content="",
 				metadata={"changes": changes},
+				timestamp=time.time() * 1000,
 			)
 		)
 	#==================================================================================================
@@ -402,7 +458,6 @@ async def chat_endpoint(req: ChatRequest):
 	# https://openai.github.io/openai-agents-python/ref/result/#agents.result.RunResult.to_input_list
 	state["input_items"] = result.to_input_list() #check above links for to_input_list method details
 	state["current_agent"] = current_agent.name
-	conversation_store.save(conversation_id, state)
 	#==================================================================================================
 
 	# Build guardrail results: mark failures (if any), and any others as passed
@@ -421,17 +476,69 @@ async def chat_endpoint(req: ChatRequest):
 				passed=True,
 				timestamp=time.time() * 1000,
 			))
-    
+
+	state.setdefault("trace_history", []).append(
+		{
+			"trace_id": trace_id,
+			"timestamp": now_ms,
+			"agent": current_agent.name,
+			"messages": [m.model_dump() for m in messages],
+			"guardrails": [g.model_dump() for g in final_guardrails],
+		}
+	)
+	conversation_store.save(conversation_id, state)
+
+	telemetry.record_trace(
+		trace_id=trace_id,
+		conversation_id=conversation_id,
+		agent=current_agent.name,
+		user_message=req.message,
+		assistant_messages=[m.model_dump() for m in messages],
+		guardrails=[g.model_dump() for g in final_guardrails],
+		metadata={"events": [e.model_dump() for e in events]},
+	)
+
 	#return response for frontend
 	return ChatResponse(
 		conversation_id=conversation_id,
 		current_agent=current_agent.name,
 		messages=messages,
 		events=events,
-		context=state["context"].dict(),
+		context=state["context"].model_dump(),
 		agents=_build_agents_list(),
 		guardrails=final_guardrails,
+		trace_id=trace_id,
 	)
+
+
+@app.post("/api/feedback")
+async def feedback_endpoint(req: FeedbackRequest):
+	"""Collect user feedback from the UI and optionally forward to Langfuse."""
+	if req.score < 0 or req.score > 1:
+		raise HTTPException(status_code=400, detail="Score must be between 0 and 1")
+
+	state = conversation_store.get(req.conversation_id)
+	if state is None:
+		raise HTTPException(status_code=404, detail="Conversation not found")
+
+	entry = {
+		"message_id": req.message_id,
+		"trace_id": req.trace_id,
+		"score": req.score,
+		"comment": req.comment,
+		"timestamp": time.time() * 1000,
+	}
+	state.setdefault("feedback", []).append(entry)
+	conversation_store.save(req.conversation_id, state)
+
+	sent_to_langfuse = telemetry.submit_feedback(
+		trace_id=req.trace_id,
+		score=req.score,
+		comment=req.comment,
+		metadata={"conversation_id": req.conversation_id, "message_id": req.message_id},
+	)
+
+	return {"status": "ok", "sent_to_langfuse": sent_to_langfuse}
 
 
 dist = files("agents_demo").joinpath("ui").joinpath("out")

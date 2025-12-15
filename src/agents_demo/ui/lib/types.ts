@@ -3,6 +3,8 @@ export interface Message {
   content: string
   role: "user" | "assistant"
   agent?: string
+  traceId?: string
+  feedback?: "positive" | "negative" | null
   timestamp: Date
 }
 
@@ -43,4 +45,3 @@ export interface GuardrailCheck {
   passed: boolean
   timestamp: Date
 }
-

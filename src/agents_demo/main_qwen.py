@@ -98,22 +98,27 @@ from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 # ======================================
 
 class AirlineAgentContext(BaseModel):
-    """Context for airline customer service agents."""
-    passenger_name: str | None = None
-    confirmation_number: str | None = None
-    seat_number: str | None = None
-    flight_number: str | None = None
-    account_number: str | None = None  # Account number associated with the customer
+	"""Context for airline customer service agents."""
+	passenger_name: str | None = None
+	confirmation_number: str | None = None
+	seat_number: str | None = None
+	flight_number: str | None = None
+	account_number: str | None = None  # Account number associated with the customer
+	meal_preference: str | None = None
+	dietary_restrictions: str | None = None
+	special_requests: str | None = None
+	meal_status: str | None = None  # e.g. "ordered", "pending", etc.
 
 def create_initial_context() -> AirlineAgentContext:
-    """
-    Factory for a new AirlineAgentContext.
-    For demo: generates a fake account number.
-    In production, this should be set from real user data.
-    """
-    ctx = AirlineAgentContext()
-    ctx.account_number = str(random.randint(10000000, 99999999))
-    return ctx
+	"""
+	Factory for a new AirlineAgentContext.
+	For demo: generates a fake account number.
+	In production, this should be set from real user data.
+	"""
+	ctx = AirlineAgentContext()
+	ctx.account_number = str(random.randint(10000000, 99999999))
+	ctx.meal_status = "not_requested"
+	return ctx
 
 # =========================
 # TOOLS without context!
@@ -155,13 +160,65 @@ async def flight_status_tool(flight_number: str) -> str:
     description_override="Lookup baggage allowance and fees."
 )
 async def baggage_tool(query: str) -> str:
-    """Lookup baggage allowance and fees."""
-    q = query.lower()
-    if "fee" in q:
-        return "Overweight bag fee is $75."
-    if "allowance" in q:
-        return "One carry-on and one checked bag (up to 50 lbs) are included."
-    return "Please provide details about your baggage inquiry."
+	"""Lookup baggage allowance and fees."""
+	q = query.lower()
+	if "fee" in q:
+		return "Overweight bag fee is $75."
+	if "allowance" in q:
+		return "One carry-on and one checked bag (up to 50 lbs) are included."
+	return "Please provide details about your baggage inquiry."
+
+
+@function_tool(
+    name_override="record_meal_preference",
+    description_override="Capture the passenger's meal choice, dietary restrictions, and special requests.",
+)
+async def record_meal_preference(
+    context: RunContextWrapper[AirlineAgentContext],
+    meal_choice: str,
+    dietary_notes: str | None = None,
+    special_requests: str | None = None,
+) -> str:
+    """Persist the passenger's meal preferences into shared context."""
+    ctx = context.context
+    ctx.meal_preference = meal_choice
+    ctx.dietary_restrictions = dietary_notes
+    ctx.special_requests = special_requests
+    ctx.meal_status = "pending_confirmation"
+    return (
+        f"Saved meal choice '{meal_choice}'. "
+        f"Dietary notes: {dietary_notes or 'none'}. "
+        f"Special requests: {special_requests or 'none'}."
+    )
+
+
+@function_tool(
+    name_override="check_menu_options",
+    description_override="Review available onboard meal options for this route.",
+)
+async def check_menu_options(
+    context: RunContextWrapper[AirlineAgentContext],
+) -> str:
+    """Return a small, deterministic menu for the demo."""
+    flight_hint = context.context.flight_number or "the current flight"
+    return (
+        f"For {flight_hint}, we can offer: "
+        "1) Grilled chicken with rice, 2) Vegetarian pasta, 3) Gluten-free snack box, "
+        "4) Vegan tofu bowl. We can also provide nut-free and low-sodium options on request."
+    )
+
+
+@function_tool(
+    name_override="confirm_meal_selection",
+    description_override="Submit the passenger's meal order and mark it in the record.",
+)
+async def confirm_meal_selection(
+    context: RunContextWrapper[AirlineAgentContext], choice: str
+) -> str:
+    """Confirm the chosen meal and update context."""
+    context.context.meal_preference = choice
+    context.context.meal_status = "ordered"
+    return f"Meal preference '{choice}' confirmed and added to the booking."
 
 
 # ======================================
@@ -392,6 +449,33 @@ cancellation_agent = Agent[AirlineAgentContext](
     input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
 
+def food_service_instructions(
+    run_context: RunContextWrapper[AirlineAgentContext], agent: Agent[AirlineAgentContext]
+) -> str:
+    ctx = run_context.context
+    confirmation = ctx.confirmation_number or "[unknown]"
+    seat = ctx.seat_number or "[unknown]"
+    meal = ctx.meal_preference or "not captured"
+    return (
+        f"{RECOMMENDED_PROMPT_PREFIX}\n"
+        "You are the Food Service Agent. Assist passengers with inflight meal preferences and dietary needs.\n"
+        f"1. Current confirmation: {confirmation}, seat: {seat}. If missing, politely collect them.\n"
+        f"2. Existing meal note: {meal}. Ask about allergies or dietary restrictions before suggesting options.\n"
+        "3. Offer relevant options using the check_menu_options tool. Use record_meal_preference to capture choices, "
+        "then confirm_meal_selection once the customer agrees.\n"
+        "4. If the request is unrelated to meals/food, hand off to the triage agent."
+    )
+
+food_service_agent = Agent[AirlineAgentContext](
+    name="Food Service Agent",
+    #model="gpt-4.1",
+    model=qwen_model1,
+    handoff_description="Handles onboard meal preferences and dietary requests.",
+    instructions=food_service_instructions,
+    tools=[check_menu_options, record_meal_preference, confirm_meal_selection],
+    input_guardrails=[relevance_guardrail, jailbreak_guardrail],
+)
+
 faq_agent = Agent[AirlineAgentContext](
     name="FAQ Agent",
     #model="gpt-4.1",
@@ -422,6 +506,7 @@ triage_agent = Agent[AirlineAgentContext](
         handoff(agent=cancellation_agent, on_handoff=on_cancellation_handoff),
         faq_agent,
         handoff(agent=seat_booking_agent, on_handoff=on_seat_booking_handoff),
+        food_service_agent,
     ],
     input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
@@ -444,3 +529,6 @@ seat_booking_agent.handoffs.append(triage_agent)
 flight_status_agent.handoffs.append(triage_agent)
 # Add cancellation agent handoff back to triage
 cancellation_agent.handoffs.append(triage_agent)
+food_service_agent.handoffs.append(triage_agent)
+# Seat changes often lead to meal changes; allow direct handoff.
+seat_booking_agent.handoffs.append(food_service_agent)

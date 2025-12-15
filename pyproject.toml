@@ -1,0 +1,37 @@
+[project]
+name = "agents_demo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "acture", email = "acturea@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "dotenv>=0.9.9",
+    "fastapi>=0.124.4",
+    "gradio>=6.1.0",
+    "langfuse>=3.10.6",
+    "nest-asyncio>=1.6.0",
+    "openai-agents>=0.6.3",
+    "openinference-instrumentation-openai-agents>=1.4.0",
+    "pydantic>=2.12.4",
+    "uvicorn>=0.38.0",
+]
+classifiers = ["Private :: Do Not Upload"]
+
+
+[project.scripts]
+demo_serve_fastapi= "agents_demo.serve:serve_fastapi"
+demo_serve_gradio = "agents_demo.serve:serve_gradio"
+demo_serve_both = "agents_demo.serve:serve_both"
+
+
+[build-system]
+requires = ["uv_build>=0.9.16,<0.10.0"]
+build-backend = "uv_build"
+
+
+[tool.uv.build-backend]
+module-root = "src"
+source-exclude = ["**/.next/**", "**/node_modules/**"]

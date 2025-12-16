@@ -204,30 +204,34 @@ async def evaluate_and_score_trace(
         agent_name=agent_name,
     )
 
-    # Submit to Langfuse if client is provided
+    # Submit to Langfuse if client is provided (v3 API)
     if langfuse_client:
         try:
-            # Submit individual scores
-            langfuse_client.score(
+            # Submit individual scores using v3 API create_score method
+            langfuse_client.create_score(
                 trace_id=trace_id,
                 name="llm_judge_helpfulness",
                 value=score.helpfulness,
+                data_type="NUMERIC",
                 comment=score.reasoning,
             )
-            langfuse_client.score(
+            langfuse_client.create_score(
                 trace_id=trace_id,
                 name="llm_judge_accuracy",
                 value=score.accuracy,
+                data_type="NUMERIC",
             )
-            langfuse_client.score(
+            langfuse_client.create_score(
                 trace_id=trace_id,
                 name="llm_judge_relevance",
                 value=score.relevance,
+                data_type="NUMERIC",
             )
-            langfuse_client.score(
+            langfuse_client.create_score(
                 trace_id=trace_id,
                 name="llm_judge_overall",
                 value=score.overall_score,
+                data_type="NUMERIC",
                 comment=score.improvement_suggestions or score.reasoning,
             )
 

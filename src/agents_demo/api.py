@@ -62,16 +62,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 #===================================================================================
-# Initialize Langfuse client for trace management
+# Initialize Langfuse client for trace management (v3 API)
 #===================================================================================
 try:
-	from langfuse import Langfuse
-	langfuse_client = Langfuse(
-		public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-		secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-		host=os.getenv("LANGFUSE_HOST", "https://us.cloud.langfuse.com"),
-	)
-	logger.info("Langfuse client initialized successfully")
+	from langfuse import get_client
+	# Note: get_client() automatically reads from environment variables:
+	# LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST (or LANGFUSE_BASE_URL)
+	langfuse_client = get_client()
+	logger.info("Langfuse client initialized successfully (v3 SDK)")
 	LANGFUSE_ENABLED = True
 except Exception as e:
 	logger.warning(f"Langfuse initialization failed: {e}. Tracing will be disabled.")
@@ -259,17 +257,18 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
 	now_ms = time.time() * 1000
 
 	#===================================================================================
-	# Create Langfuse trace for this interaction
+	# Create Langfuse trace for this interaction (v3 API)
 	#===================================================================================
 	langfuse_trace = None
 	if LANGFUSE_ENABLED and langfuse_client:
 		try:
-			langfuse_trace = langfuse_client.trace(
-				id=trace_id,
+			# In v3 API, use start_span to create a trace
+			langfuse_trace = langfuse_client.start_span(
 				name="agent_chat_interaction",
-				user_id=req.conversation_id or "anonymous",
 				metadata={
+					"trace_id": trace_id,
 					"conversation_id": req.conversation_id,
+					"user_id": req.conversation_id or "anonymous",
 					"user_message": req.message,
 					"timestamp": now_ms,
 				},
@@ -572,12 +571,12 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
 	)
 
 	#===================================================================================
-	# Update Langfuse trace with agent response and metadata
+	# Update and end Langfuse trace with agent response and metadata (v3 API)
 	#===================================================================================
 	if LANGFUSE_ENABLED and langfuse_trace:
 		try:
 			langfuse_trace.update(
-				output=[m.content for m in messages],
+				output={"messages": [m.content for m in messages]},
 				metadata={
 					"agent": current_agent.name,
 					"guardrails_passed": all(g.passed for g in final_guardrails),
@@ -585,9 +584,11 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
 					"context": state["context"].model_dump() if hasattr(state["context"], "model_dump") else state["context"],
 				},
 			)
+			# End the span to complete the trace
+			langfuse_trace.end()
 			# Flush to ensure data is sent to Langfuse
 			langfuse_client.flush()
-			logger.info(f"Updated Langfuse trace {trace_id} with agent response")
+			logger.info(f"Updated and ended Langfuse trace {trace_id} with agent response")
 		except Exception as e:
 			logger.warning(f"Failed to update Langfuse trace: {e}")
 

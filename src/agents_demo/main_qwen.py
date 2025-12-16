@@ -2,39 +2,46 @@ from __future__ import annotations as _annotations
 
 import json
 import random
+import os
 from pathlib import Path
 from pydantic import BaseModel
 import string
+from dotenv import load_dotenv
 
+
+# Load environment variables from .env file
+load_dotenv()
 
 # qwen model for agent construction
 from openai import AsyncOpenAI
 from agents import OpenAIChatCompletionsModel, Model, ModelProvider,RunConfig, ModelSettings,set_tracing_disabled
 
-"""  
+"""
+Model Configuration - now using environment variables
 https://bailian.console.aliyun.com/?tab=model#/model-market/detail/qwen3-next-80b-a3b-instruct
 """
-BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-API_KEY = "sk-f55837467fd543a49cfc5cecd003d788"  #quick demo key, please use your own key
-
-#MODEL_NAME = "qwen3-next-80b-a3b-instruct" #no extra body
-MODEL_NAME1 = "qwen3-next-80b-a3b-instruct"
-#MODEL_NAME2 = "qwen3-30b-a3b-instruct-2507"  #no extra body
-MODEL_NAME2 = MODEL_NAME1
-#MODEL_NAME2 = "qwen3-14b"
 
 #======================================================
-# One model is used for all agents for quick testing
+# Load configuration from environment variables
 #======================================================
-OpenAIModel=True  #openai model
-OutputSteaming=False  #streaming output,can be False for qwen3-next-80b-a3b-instruct  
-mt = ModelSettings(extra_body = {"enable_thinking":True}) #must be true for model with thinking string? 
+OpenAIModel = os.getenv("USE_OPENAI_MODEL", "true").lower() == "true"
+OutputSteaming = os.getenv("OUTPUT_STREAMING", "false").lower() == "true"
 
-if OpenAIModel: #quick testing, don't leak the key
-  BASE_URL = "https://api.openai.com/v1"
-  API_KEY = "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"
-  MODEL_NAME1 = "gpt-4.1"
-  MODEL_NAME2 = "gpt-4.1-mini" 
+if OpenAIModel:
+    BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    API_KEY = os.getenv("OPENAI_API_KEY", "")
+    MODEL_NAME1 = os.getenv("OPENAI_MODEL_NAME", "gpt-4.1")
+    MODEL_NAME2 = os.getenv("OPENAI_MODEL_NAME_MINI", "gpt-4.1-mini")
+else:
+    BASE_URL = os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    API_KEY = os.getenv("QWEN_API_KEY", "")
+    MODEL_NAME1 = os.getenv("QWEN_MODEL_NAME", "qwen3-next-80b-a3b-instruct")
+    MODEL_NAME2 = os.getenv("QWEN_MODEL_NAME_MINI", "qwen3-next-80b-a3b-instruct")
+
+#======================================================
+# Model settings for Qwen (enable_thinking parameter)
+#======================================================
+mt = ModelSettings(extra_body = {"enable_thinking": True}) 
 
 if not BASE_URL or not API_KEY or not MODEL_NAME1:
     raise ValueError(
@@ -44,9 +51,10 @@ if not BASE_URL or not API_KEY or not MODEL_NAME1:
 client1 = AsyncOpenAI(base_url=BASE_URL, api_key=API_KEY)
 client2 = AsyncOpenAI(base_url=BASE_URL, api_key=API_KEY) #no use
 #=========================================================
-#disable tracing, set to False to enable langfuse tracing
+# Enable Langfuse tracing for observation and evaluation
+# Set to True to disable if needed for testing
 #=========================================================
-set_tracing_disabled(disabled=True)  
+set_tracing_disabled(disabled=False)  
 
 #OpenAIChatCompletionsModel(model=model_name or MODEL_NAME, openai_client=client)
 qwen_model1 = OpenAIChatCompletionsModel(model=MODEL_NAME1, openai_client=client1) #useless when only one model for all agents

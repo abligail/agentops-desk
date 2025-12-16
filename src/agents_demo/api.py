@@ -1,15 +1,21 @@
 from importlib.resources import files
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
 import time
 import logging
+import asyncio
 
 from starlette.staticfiles import StaticFiles
+
+# Load environment variables
+load_dotenv()
 
 # Import agents and context creation from main_qwen (SUPPORT QWEN MODEL)
 from .main_qwen import (
@@ -26,6 +32,7 @@ from .main_qwen import OpenAIModel as bOpenAIModel  # True: use OpenAI model; Fa
 from .main_qwen import myRunConfig
 from .storage import JsonConversationStore
 from .telemetry import Telemetry
+from .evaluators import evaluate_and_score_trace
 
 
 """
@@ -53,6 +60,23 @@ from agents import (
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+#===================================================================================
+# Initialize Langfuse client for trace management
+#===================================================================================
+try:
+	from langfuse import Langfuse
+	langfuse_client = Langfuse(
+		public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+		secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+		host=os.getenv("LANGFUSE_HOST", "https://us.cloud.langfuse.com"),
+	)
+	logger.info("Langfuse client initialized successfully")
+	LANGFUSE_ENABLED = True
+except Exception as e:
+	logger.warning(f"Langfuse initialization failed: {e}. Tracing will be disabled.")
+	langfuse_client = None
+	LANGFUSE_ENABLED = False
 
 #fastapi app instance
 app = FastAPI()
@@ -197,14 +221,63 @@ def _build_agents_list() -> List[Dict[str, Any]]:
 	]
 
 # =========================
+# Background Tasks
+# =========================
+
+async def run_llm_judge_evaluation(
+	trace_id: str,
+	user_message: str,
+	assistant_messages: List[str],
+	agent_name: str,
+):
+	"""Background task to evaluate response quality using LLM-as-a-Judge."""
+	if not LANGFUSE_ENABLED or not langfuse_client:
+		logger.info("Langfuse not enabled, skipping LLM judge evaluation")
+		return
+
+	try:
+		await evaluate_and_score_trace(
+			trace_id=trace_id,
+			user_message=user_message,
+			assistant_messages=assistant_messages,
+			agent_name=agent_name,
+			langfuse_client=langfuse_client,
+		)
+		logger.info(f"LLM judge evaluation completed for trace {trace_id}")
+	except Exception as e:
+		logger.error(f"LLM judge evaluation failed for trace {trace_id}: {e}")
+
+
+# =========================
 # Main Chat Endpoint
-# =========================7
+# =========================
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat_endpoint(req: ChatRequest):
+async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
 	print(f"Received chat request: conversation_id={req.conversation_id}, message={req.message} ")
 	trace_id = uuid4().hex
 	now_ms = time.time() * 1000
+
+	#===================================================================================
+	# Create Langfuse trace for this interaction
+	#===================================================================================
+	langfuse_trace = None
+	if LANGFUSE_ENABLED and langfuse_client:
+		try:
+			langfuse_trace = langfuse_client.trace(
+				id=trace_id,
+				name="agent_chat_interaction",
+				user_id=req.conversation_id or "anonymous",
+				metadata={
+					"conversation_id": req.conversation_id,
+					"user_message": req.message,
+					"timestamp": now_ms,
+				},
+			)
+			logger.info(f"Created Langfuse trace: {trace_id}")
+		except Exception as e:
+			logger.warning(f"Failed to create Langfuse trace: {e}")
+
 	"""
 	Main chat endpoint for agent orchestration.
 	Handles conversation state, agent routing, and guardrail checks.
@@ -497,6 +570,39 @@ async def chat_endpoint(req: ChatRequest):
 		guardrails=[g.model_dump() for g in final_guardrails],
 		metadata={"events": [e.model_dump() for e in events]},
 	)
+
+	#===================================================================================
+	# Update Langfuse trace with agent response and metadata
+	#===================================================================================
+	if LANGFUSE_ENABLED and langfuse_trace:
+		try:
+			langfuse_trace.update(
+				output=[m.content for m in messages],
+				metadata={
+					"agent": current_agent.name,
+					"guardrails_passed": all(g.passed for g in final_guardrails),
+					"events_count": len(events),
+					"context": state["context"].model_dump() if hasattr(state["context"], "model_dump") else state["context"],
+				},
+			)
+			# Flush to ensure data is sent to Langfuse
+			langfuse_client.flush()
+			logger.info(f"Updated Langfuse trace {trace_id} with agent response")
+		except Exception as e:
+			logger.warning(f"Failed to update Langfuse trace: {e}")
+
+	#===================================================================================
+	# Schedule LLM-as-a-Judge evaluation as background task (optional - can be disabled)
+	#===================================================================================
+	if messages and os.getenv("ENABLE_LLM_JUDGE", "true").lower() == "true":
+		background_tasks.add_task(
+			run_llm_judge_evaluation,
+			trace_id=trace_id,
+			user_message=req.message,
+			assistant_messages=[m.content for m in messages],
+			agent_name=current_agent.name,
+		)
+		logger.info(f"Scheduled LLM judge evaluation for trace {trace_id}")
 
 	#return response for frontend
 	return ChatResponse(

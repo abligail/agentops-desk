@@ -48,11 +48,17 @@ import nest_asyncio
 
 
 #=========================================
-# added for langfuse
+# Load environment variables for Langfuse
 #=========================================
-os.environ["LANGFUSE_PUBLIC_KEY"] = "pk-lf-6dc235c0-ed5f-4059-a194-47aaf65cac4a" 
-os.environ["LANGFUSE_SECRET_KEY"] = "sk-lf-b1c698d3-40fe-4023-b5b5-5844f20d56d9" 
-os.environ["LANGFUSE_HOST"] = "https://us.cloud.langfuse.com"
+load_dotenv()
+
+# Set Langfuse environment variables if not already set
+if not os.getenv("LANGFUSE_PUBLIC_KEY"):
+    os.environ["LANGFUSE_PUBLIC_KEY"] = "pk-lf-6dc235c0-ed5f-4059-a194-47aaf65cac4a"
+if not os.getenv("LANGFUSE_SECRET_KEY"):
+    os.environ["LANGFUSE_SECRET_KEY"] = "sk-lf-b1c698d3-40fe-4023-b5b5-5844f20d56d9"
+if not os.getenv("LANGFUSE_HOST"):
+    os.environ["LANGFUSE_HOST"] = "https://us.cloud.langfuse.com"
 
 nest_asyncio.apply()
 
@@ -347,12 +353,15 @@ async def create_response_fastapi(message, chat_history):
     # ==============================================================
 
     #=================================================================================================
-    #trace id (langfuse obeservation) should be fetched from backend response(agent_response)
-    current_trace_id = "200433200433"  #placeholder only, add real trace id from response if possible
+    # Extract real trace_id from backend response (if available)
+    #=================================================================================================
+    current_trace_id = getattr(agent_response, 'trace_id', None) or "unknown_trace"
+    if current_trace_id == "unknown_trace":
+        logger.warning("No trace_id in simple agent response")
     #=================================================================================================
 
     chat_history.append({"role": "user", "content": message})
-    chat_history_sibling.append({"role": "user", "content": message, "current_trace_id": current_trace_id})  #trace id should from response
+    chat_history_sibling.append({"role": "user", "content": message, "current_trace_id": current_trace_id})
     chat_history.append({"role": "assistant", "content": bot_message})
     chat_history_sibling.append({"role": "assistant", "content": bot_message, "current_trace_id": current_trace_id})
     
@@ -436,16 +445,19 @@ async def create_response_fastapi_workflow(message, chat_history):
             if(session_id_workflow != agent_response.conversation_id):
                 session_id_workflow = agent_response.conversation_id
                 #print(f"Updated session_id_workflow: {session_id_workflow}")
-        
+
         #for data that shoud be cleared after the clear button is clicked
         if len( chat_history_sibling) > len(chat_history):
             chat_history_sibling.clear()
-                
+
         chat_history.append({"role": "user", "content": message})
 
         #=================================================================================================
-        #trace id (langfuse obeservation) should be fetched from backend response(agent_response)
-        current_trace_id = "200433200433"  #placeholder only, add real trace id from response if possible
+        # Extract real trace_id from backend response
+        #=================================================================================================
+        current_trace_id = getattr(agent_response, 'trace_id', None) or "unknown_trace"
+        if current_trace_id == "unknown_trace":
+            logger.warning("No trace_id received from backend")
         #=================================================================================================
 
         chat_history_sibling.append({"role": "user", "content": message, "current_trace_id": current_trace_id})

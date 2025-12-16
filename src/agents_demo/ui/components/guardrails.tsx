@@ -46,7 +46,7 @@ export function Guardrails({ guardrails, inputGuardrails }: GuardrailsProps) {
       title="Guardrails"
       icon={<Shield className="h-4 w-4 text-blue-600" />}
     >
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {guardrailsToShow.map((gr) => (
           <Card
             key={gr.id}

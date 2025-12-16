@@ -1,6 +1,8 @@
 from __future__ import annotations as _annotations
 
+import json
 import random
+from pathlib import Path
 from pydantic import BaseModel
 import string
 
@@ -109,6 +111,33 @@ class AirlineAgentContext(BaseModel):
 	special_requests: str | None = None
 	meal_status: str | None = None  # e.g. "ordered", "pending", etc.
 
+DATA_DIR = Path(__file__).resolve().parent / "data"
+CUSTOMER_PROFILE_PATH = DATA_DIR / "customer_profiles.json"
+
+def _load_profile_data() -> list[dict[str, str]]:
+	try:
+		raw = json.loads(CUSTOMER_PROFILE_PATH.read_text(encoding="utf-8"))
+		if isinstance(raw, list):
+			return raw
+	except Exception:
+		# best-effort load for demo; fall back to empty list
+		return []
+	return []
+
+CUSTOMER_PROFILES = _load_profile_data()
+
+def _pick_account_number() -> str:
+	if CUSTOMER_PROFILES:
+		acct = random.choice(CUSTOMER_PROFILES).get("account_number")
+		if acct:
+			return acct
+	return str(random.randint(10000000, 99999999))
+
+def _get_profile_by_account(account_number: str | None) -> dict[str, str] | None:
+	if not account_number:
+		return None
+	return next((p for p in CUSTOMER_PROFILES if p.get("account_number") == account_number), None)
+
 def create_initial_context() -> AirlineAgentContext:
 	"""
 	Factory for a new AirlineAgentContext.
@@ -116,7 +145,7 @@ def create_initial_context() -> AirlineAgentContext:
 	In production, this should be set from real user data.
 	"""
 	ctx = AirlineAgentContext()
-	ctx.account_number = str(random.randint(10000000, 99999999))
+	ctx.account_number = _pick_account_number()
 	ctx.meal_status = "not_requested"
 	return ctx
 
@@ -219,6 +248,40 @@ async def confirm_meal_selection(
     context.context.meal_preference = choice
     context.context.meal_status = "ordered"
     return f"Meal preference '{choice}' confirmed and added to the booking."
+
+
+@function_tool(
+    name_override="fetch_customer_profile",
+    description_override="Load passenger profile details from stored records using the account number.",
+)
+async def fetch_customer_profile(
+    context: RunContextWrapper[AirlineAgentContext], account_number: str | None = None
+) -> str:
+    """Populate context fields from a persisted customer profile."""
+    acct = account_number or context.context.account_number
+    if not acct:
+        return "No account number available yet. Please ask the customer to provide it."
+
+    profile = _get_profile_by_account(acct)
+    if not profile:
+        return f"No stored profile found for account {acct}."
+
+    ctx = context.context
+    ctx.account_number = profile.get("account_number") or acct
+    ctx.passenger_name = profile.get("passenger_name", ctx.passenger_name)
+    ctx.confirmation_number = profile.get("confirmation_number", ctx.confirmation_number)
+    ctx.flight_number = profile.get("flight_number", ctx.flight_number)
+    ctx.seat_number = profile.get("seat_number", ctx.seat_number)
+    ctx.meal_preference = profile.get("meal_preference", ctx.meal_preference)
+    ctx.dietary_restrictions = profile.get("dietary_restrictions", ctx.dietary_restrictions)
+    ctx.special_requests = profile.get("special_requests", ctx.special_requests)
+    ctx.meal_status = profile.get("meal_status") or ctx.meal_status or "not_requested"
+
+    return (
+        f"Profile loaded for {ctx.passenger_name or 'the passenger'} (account {ctx.account_number}). "
+        f"Confirmation {ctx.confirmation_number or 'unknown'}, flight {ctx.flight_number or 'unknown'}, "
+        f"seat {ctx.seat_number or 'unknown'}; meal preference: {ctx.meal_preference or 'unspecified'}."
+    )
 
 
 # ======================================
@@ -355,7 +418,7 @@ def seat_booking_instructions(
         f"{RECOMMENDED_PROMPT_PREFIX}\n"
         "You are a seat booking agent. If you are speaking to a customer, you probably were transferred to from the triage agent.\n"
         "Use the following routine to support the customer.\n"
-        f"1. The customer's confirmation number is {confirmation}."+
+        f"1. The customer's confirmation number is {confirmation}. If you have an account number, call fetch_customer_profile to hydrate details.\n"
         "If this is not available, ask the customer for their confirmation number. If you have it, confirm that is the confirmation number they are referencing.\n"
         "2. Ask the customer what their desired seat number is. You can also use the display_seat_map tool to show them an interactive seat map where they can click to select their preferred seat.\n"
         "3. Use the update seat tool to update the seat on the flight.\n"
@@ -369,7 +432,7 @@ seat_booking_agent = Agent[AirlineAgentContext](
     
     handoff_description="A helpful agent that can update a seat on a flight.",
     instructions=seat_booking_instructions,
-    tools=[update_seat, display_seat_map],
+    tools=[fetch_customer_profile, update_seat, display_seat_map],
     input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
 
@@ -383,7 +446,7 @@ def flight_status_instructions(
         f"{RECOMMENDED_PROMPT_PREFIX}\n"
         "You are a Flight Status Agent. Use the following routine to support the customer:\n"
         f"1. The customer's confirmation number is {confirmation} and flight number is {flight}.\n"
-        "   If either is not available, ask the customer for the missing information. If you have both, confirm with the customer that these are correct.\n"
+        "   If either is not available, first call fetch_customer_profile when you have an account number; otherwise ask the customer for the missing information. If you have both, confirm with the customer that these are correct.\n"
         "2. Use the flight_status_tool to report the status of the flight.\n"
         "If the customer asks a question that is not related to flight status, transfer back to the triage agent."
     )
@@ -395,7 +458,7 @@ flight_status_agent = Agent[AirlineAgentContext](
     
     handoff_description="An agent to provide flight status information.",
     instructions=flight_status_instructions,
-    tools=[flight_status_tool],
+    tools=[fetch_customer_profile, flight_status_tool],
     input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
 
@@ -433,7 +496,7 @@ def cancellation_instructions(
         f"{RECOMMENDED_PROMPT_PREFIX}\n"
         "You are a Cancellation Agent. Use the following routine to support the customer:\n"
         f"1. The customer's confirmation number is {confirmation} and flight number is {flight}.\n"
-        "   If either is not available, ask the customer for the missing information. If you have both, confirm with the customer that these are correct.\n"
+        "   If either is not available, first call fetch_customer_profile when you have an account number; otherwise ask the customer for the missing information. If you have both, confirm with the customer that these are correct.\n"
         "2. If the customer confirms, use the cancel_flight tool to cancel their flight.\n"
         "If the customer asks anything else, transfer back to the triage agent."
     )
@@ -445,35 +508,35 @@ cancellation_agent = Agent[AirlineAgentContext](
     
     handoff_description="An agent to cancel flights.",
     instructions=cancellation_instructions,
-    tools=[cancel_flight],
+    tools=[fetch_customer_profile, cancel_flight],
     input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
 
 def food_service_instructions(
-    run_context: RunContextWrapper[AirlineAgentContext], agent: Agent[AirlineAgentContext]
+	run_context: RunContextWrapper[AirlineAgentContext], agent: Agent[AirlineAgentContext]
 ) -> str:
-    ctx = run_context.context
-    confirmation = ctx.confirmation_number or "[unknown]"
-    seat = ctx.seat_number or "[unknown]"
-    meal = ctx.meal_preference or "not captured"
-    return (
-        f"{RECOMMENDED_PROMPT_PREFIX}\n"
-        "You are the Food Service Agent. Assist passengers with inflight meal preferences and dietary needs.\n"
-        f"1. Current confirmation: {confirmation}, seat: {seat}. If missing, politely collect them.\n"
-        f"2. Existing meal note: {meal}. Ask about allergies or dietary restrictions before suggesting options.\n"
-        "3. Offer relevant options using the check_menu_options tool. Use record_meal_preference to capture choices, "
-        "then confirm_meal_selection once the customer agrees.\n"
-        "4. If the request is unrelated to meals/food, hand off to the triage agent."
-    )
+	ctx = run_context.context
+	confirmation = ctx.confirmation_number or "[unknown]"
+	seat = ctx.seat_number or "[unknown]"
+	meal = ctx.meal_preference or "not captured"
+	return (
+		f"{RECOMMENDED_PROMPT_PREFIX}\n"
+		"You are the Food Service Agent. Assist passengers with inflight meal preferences and dietary needs.\n"
+		f"1. Current confirmation: {confirmation}, seat: {seat}. If missing, use fetch_customer_profile when possible or politely collect them.\n"
+		f"2. Existing meal note: {meal}. Ask about allergies or dietary restrictions before suggesting options.\n"
+		"3. Offer relevant options using the check_menu_options tool. Use record_meal_preference to capture choices, "
+		"then confirm_meal_selection once the customer agrees.\n"
+		"4. If the request is unrelated to meals/food, hand off to the triage agent."
+	)
 
 food_service_agent = Agent[AirlineAgentContext](
-    name="Food Service Agent",
-    #model="gpt-4.1",
-    model=qwen_model1,
-    handoff_description="Handles onboard meal preferences and dietary requests.",
-    instructions=food_service_instructions,
-    tools=[check_menu_options, record_meal_preference, confirm_meal_selection],
-    input_guardrails=[relevance_guardrail, jailbreak_guardrail],
+	name="Food Service Agent",
+	#model="gpt-4.1",
+	model=qwen_model1,
+	handoff_description="Handles onboard meal preferences and dietary requests.",
+	instructions=food_service_instructions,
+	tools=[fetch_customer_profile, check_menu_options, record_meal_preference, confirm_meal_selection],
+	input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
 
 faq_agent = Agent[AirlineAgentContext](

@@ -1,0 +1,35 @@
+[
+  {
+    "account_number": "38249175",
+    "passenger_name": "Alex Chen",
+    "confirmation_number": "AX19QZ",
+    "flight_number": "FLT-238",
+    "seat_number": "14C",
+    "meal_preference": "vegetarian",
+    "dietary_restrictions": "no peanuts",
+    "special_requests": "aisle seat preferred",
+    "meal_status": "ordered"
+  },
+  {
+    "account_number": "90447721",
+    "passenger_name": "Morgan Lee",
+    "confirmation_number": "LM72DR",
+    "flight_number": "FLT-476",
+    "seat_number": "6A",
+    "meal_preference": "gluten-free snack box",
+    "dietary_restrictions": "gluten sensitive",
+    "special_requests": "early boarding for medical device",
+    "meal_status": "pending_confirmation"
+  },
+  {
+    "account_number": "55112004",
+    "passenger_name": "Priya Patel",
+    "confirmation_number": "PP30JS",
+    "flight_number": "FLT-109",
+    "seat_number": "22F",
+    "meal_preference": "standard",
+    "dietary_restrictions": "none",
+    "special_requests": "window seat",
+    "meal_status": "not_requested"
+  }
+]

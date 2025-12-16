@@ -1,0 +1,240 @@
+{
+  "domestic": {
+    "business": [
+      {
+        "meal_id": "DB001",
+        "name": "Grilled Chicken with Herb Rice",
+        "category": "main",
+        "dietary_tags": ["gluten-free"],
+        "allergens": ["none"],
+        "description": "Tender grilled chicken breast served with aromatic herb-infused rice and seasonal vegetables"
+      },
+      {
+        "meal_id": "DB002",
+        "name": "Pan-Seared Salmon Fillet",
+        "category": "main",
+        "dietary_tags": ["gluten-free"],
+        "allergens": ["fish"],
+        "description": "Fresh Atlantic salmon with quinoa pilaf and steamed asparagus"
+      },
+      {
+        "meal_id": "DB003",
+        "name": "Vegetarian Pasta Primavera",
+        "category": "main",
+        "dietary_tags": ["vegetarian"],
+        "allergens": ["gluten", "dairy"],
+        "description": "Penne pasta with seasonal vegetables in a light cream sauce"
+      },
+      {
+        "meal_id": "DB004",
+        "name": "Vegan Buddha Bowl",
+        "category": "main",
+        "dietary_tags": ["vegan", "vegetarian", "gluten-free"],
+        "allergens": ["none"],
+        "description": "Roasted vegetables, chickpeas, quinoa, and tahini dressing"
+      },
+      {
+        "meal_id": "DB005",
+        "name": "Beef Tenderloin with Mashed Potatoes",
+        "category": "main",
+        "dietary_tags": [],
+        "allergens": ["dairy"],
+        "description": "Premium beef tenderloin with creamy mashed potatoes and red wine reduction"
+      }
+    ],
+    "economy": [
+      {
+        "meal_id": "DE001",
+        "name": "Chicken Pasta",
+        "category": "main",
+        "dietary_tags": [],
+        "allergens": ["gluten", "dairy"],
+        "description": "Grilled chicken with penne pasta in tomato sauce"
+      },
+      {
+        "meal_id": "DE002",
+        "name": "Vegetarian Wrap",
+        "category": "main",
+        "dietary_tags": ["vegetarian"],
+        "allergens": ["gluten", "dairy"],
+        "description": "Whole wheat tortilla with hummus, vegetables, and cheese"
+      },
+      {
+        "meal_id": "DE003",
+        "name": "Turkey Sandwich",
+        "category": "main",
+        "dietary_tags": [],
+        "allergens": ["gluten", "dairy"],
+        "description": "Sliced turkey breast on wheat bread with lettuce and tomato"
+      },
+      {
+        "meal_id": "DE004",
+        "name": "Gluten-Free Snack Box",
+        "category": "snack",
+        "dietary_tags": ["gluten-free", "vegetarian"],
+        "allergens": ["nuts", "dairy"],
+        "description": "Cheese, crackers, nuts, fruit, and vegetables"
+      },
+      {
+        "meal_id": "DE005",
+        "name": "Fresh Fruit and Cheese Plate",
+        "category": "snack",
+        "dietary_tags": ["vegetarian", "gluten-free"],
+        "allergens": ["dairy"],
+        "description": "Seasonal fruits with assorted cheeses"
+      }
+    ]
+  },
+  "international": {
+    "business": [
+      {
+        "meal_id": "IB001",
+        "name": "Grilled Salmon with Quinoa",
+        "category": "main",
+        "dietary_tags": ["gluten-free"],
+        "allergens": ["fish"],
+        "description": "Norwegian salmon with organic quinoa, roasted vegetables, and lemon butter sauce"
+      },
+      {
+        "meal_id": "IB002",
+        "name": "Braised Short Ribs",
+        "category": "main",
+        "dietary_tags": [],
+        "allergens": ["dairy"],
+        "description": "Slow-braised beef short ribs with garlic mashed potatoes and seasonal greens"
+      },
+      {
+        "meal_id": "IB003",
+        "name": "Lobster Risotto",
+        "category": "main",
+        "dietary_tags": [],
+        "allergens": ["shellfish", "dairy"],
+        "description": "Creamy arborio risotto with Maine lobster and parmesan"
+      },
+      {
+        "meal_id": "IB004",
+        "name": "Vegan Tofu Bowl",
+        "category": "main",
+        "dietary_tags": ["vegan", "vegetarian", "gluten-free"],
+        "allergens": ["soy"],
+        "description": "Organic tofu with stir-fried vegetables, brown rice, and sesame ginger sauce"
+      },
+      {
+        "meal_id": "IB005",
+        "name": "Mediterranean Chicken",
+        "category": "main",
+        "dietary_tags": ["gluten-free"],
+        "allergens": ["dairy"],
+        "description": "Herb-marinated chicken with couscous, olives, feta, and sun-dried tomatoes"
+      },
+      {
+        "meal_id": "IB006",
+        "name": "Pan-Seared Sea Bass",
+        "category": "main",
+        "dietary_tags": ["gluten-free"],
+        "allergens": ["fish"],
+        "description": "Chilean sea bass with saffron rice and grilled vegetables"
+      },
+      {
+        "meal_id": "IB007",
+        "name": "Vegetarian Lasagna",
+        "category": "main",
+        "dietary_tags": ["vegetarian"],
+        "allergens": ["gluten", "dairy"],
+        "description": "Layered pasta with ricotta, spinach, and marinara sauce"
+      }
+    ],
+    "economy": [
+      {
+        "meal_id": "IE001",
+        "name": "Chicken Teriyaki with Rice",
+        "category": "main",
+        "dietary_tags": [],
+        "allergens": ["soy", "gluten"],
+        "description": "Grilled chicken in teriyaki sauce with steamed rice and vegetables"
+      },
+      {
+        "meal_id": "IE002",
+        "name": "Beef Pasta Bolognese",
+        "category": "main",
+        "dietary_tags": [],
+        "allergens": ["gluten", "dairy"],
+        "description": "Penne pasta with hearty beef and tomato sauce"
+      },
+      {
+        "meal_id": "IE003",
+        "name": "Vegetarian Curry",
+        "category": "main",
+        "dietary_tags": ["vegetarian", "vegan", "gluten-free"],
+        "allergens": ["none"],
+        "description": "Mixed vegetables in coconut curry sauce with basmati rice"
+      },
+      {
+        "meal_id": "IE004",
+        "name": "Fish and Chips",
+        "category": "main",
+        "dietary_tags": [],
+        "allergens": ["fish", "gluten"],
+        "description": "Beer-battered cod with French fries and tartar sauce"
+      },
+      {
+        "meal_id": "IE005",
+        "name": "Asian Noodle Bowl",
+        "category": "main",
+        "dietary_tags": ["vegetarian"],
+        "allergens": ["gluten", "soy"],
+        "description": "Stir-fried noodles with vegetables in soy-ginger sauce"
+      },
+      {
+        "meal_id": "IE006",
+        "name": "Mediterranean Wrap",
+        "category": "main",
+        "dietary_tags": ["vegetarian"],
+        "allergens": ["gluten", "dairy"],
+        "description": "Hummus, falafel, vegetables, and tzatziki in a whole wheat wrap"
+      },
+      {
+        "meal_id": "IE007",
+        "name": "Gluten-Free Snack Box",
+        "category": "snack",
+        "dietary_tags": ["gluten-free", "vegetarian"],
+        "allergens": ["nuts", "dairy"],
+        "description": "International cheese selection, nuts, fresh fruit, and rice crackers"
+      },
+      {
+        "meal_id": "IE008",
+        "name": "Fresh Fruit Salad",
+        "category": "snack",
+        "dietary_tags": ["vegetarian", "vegan", "gluten-free"],
+        "allergens": ["none"],
+        "description": "Seasonal fresh fruit medley"
+      }
+    ]
+  },
+  "special_dietary_options": {
+    "nut_free": {
+      "description": "All meals can be prepared without nuts upon request",
+      "advance_notice_hours": 24
+    },
+    "low_sodium": {
+      "description": "Low-sodium versions available for most meals",
+      "advance_notice_hours": 24
+    },
+    "diabetic": {
+      "description": "Diabetic-friendly options with controlled carbohydrates",
+      "advance_notice_hours": 48
+    },
+    "kosher": {
+      "description": "Kosher meals available on international flights",
+      "advance_notice_hours": 72
+    },
+    "halal": {
+      "description": "Halal-certified meals available on international flights",
+      "advance_notice_hours": 72
+    },
+    "child_meal": {
+      "description": "Kid-friendly meals available for passengers under 12",
+      "advance_notice_hours": 24
+    }
+  }
+}

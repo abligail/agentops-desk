@@ -5,7 +5,7 @@
     "confirmation_number": "AX19QZ",
     "flight_number": "FLT-238",
     "seat_number": "14C",
-    "meal_preference": "vegetarian",
+    "meal_preference": "Vegetarian Pasta Primavera",
     "dietary_restrictions": "no peanuts",
     "special_requests": "aisle seat preferred",
     "meal_status": "ordered"
@@ -16,7 +16,7 @@
     "confirmation_number": "LM72DR",
     "flight_number": "FLT-476",
     "seat_number": "6A",
-    "meal_preference": "gluten-free snack box",
+    "meal_preference": "Gluten-Free Snack Box",
     "dietary_restrictions": "gluten sensitive",
     "special_requests": "early boarding for medical device",
     "meal_status": "pending_confirmation"
@@ -27,9 +27,42 @@
     "confirmation_number": "PP30JS",
     "flight_number": "FLT-109",
     "seat_number": "22F",
-    "meal_preference": "standard",
+    "meal_preference": "Chicken Teriyaki with Rice",
     "dietary_restrictions": "none",
     "special_requests": "window seat",
     "meal_status": "not_requested"
+  },
+  {
+    "account_number": "67234891",
+    "passenger_name": "James Rodriguez",
+    "confirmation_number": "JR84KP",
+    "flight_number": "FLT-892",
+    "seat_number": "3F",
+    "meal_preference": "Lobster Risotto",
+    "dietary_restrictions": "shellfish allergy - hold the lobster, plain risotto",
+    "special_requests": "business class upgrade confirmed",
+    "meal_status": "ordered"
+  },
+  {
+    "account_number": "42098765",
+    "passenger_name": "Sarah Kim",
+    "confirmation_number": "SK29VX",
+    "flight_number": "FLT-567",
+    "seat_number": "7C",
+    "meal_preference": "Vegan Buddha Bowl",
+    "dietary_restrictions": "vegan, no animal products",
+    "special_requests": "exit row for extra legroom",
+    "meal_status": "ordered"
+  },
+  {
+    "account_number": "81567234",
+    "passenger_name": "Michael Zhang",
+    "confirmation_number": "MZ45TW",
+    "flight_number": "FLT-324",
+    "seat_number": "12A",
+    "meal_preference": "Turkey Sandwich",
+    "dietary_restrictions": "none",
+    "special_requests": "traveling with laptop, need power outlet",
+    "meal_status": "pending_confirmation"
   }
 ]

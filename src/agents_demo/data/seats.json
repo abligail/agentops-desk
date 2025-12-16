@@ -1,0 +1,194 @@
+{
+  "FLT-238": {
+    "aircraft": "Boeing 777-300ER",
+    "business": {
+      "rows": [1, 2, 3, 4],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F"],
+      "occupied": ["1A", "1B", "2C", "3D", "4E"],
+      "premium": ["1A", "1B", "1C", "1D", "1E", "1F"]
+    },
+    "economy": {
+      "rows": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F", "G", "H", "J"],
+      "occupied": ["5A", "6B", "7C", "8D", "9E", "10F", "11A", "12B", "13C", "14C", "15D", "16E"],
+      "exit_rows": [7, 16],
+      "economy_plus_rows": [5, 6, 7, 8]
+    }
+  },
+  "FLT-476": {
+    "aircraft": "Airbus A320",
+    "business": {
+      "rows": [1, 2, 3],
+      "seats_per_row": ["A", "B", "C", "D"],
+      "occupied": ["1A", "2B", "3C"],
+      "premium": ["1A", "1B", "1C", "1D"]
+    },
+    "economy": {
+      "rows": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F"],
+      "occupied": ["4A", "5B", "6A", "7C", "8D", "9E", "10F"],
+      "exit_rows": [6, 12],
+      "economy_plus_rows": [4, 5, 6]
+    }
+  },
+  "FLT-109": {
+    "aircraft": "Boeing 787-9 Dreamliner",
+    "business": {
+      "rows": [1, 2, 3, 4, 5],
+      "seats_per_row": ["A", "C", "D", "G"],
+      "occupied": ["1A", "2C", "3D", "4G", "5A"],
+      "premium": ["1A", "1C", "1D", "1G"]
+    },
+    "economy": {
+      "rows": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F", "G", "H", "J"],
+      "occupied": ["6A", "7B", "8C", "9D", "10E", "11F", "12G", "13H", "14J", "15A", "16B", "17C", "18D", "19E", "20F", "21G", "22F"],
+      "exit_rows": [8, 18],
+      "economy_plus_rows": [6, 7, 8, 9]
+    }
+  },
+  "FLT-892": {
+    "aircraft": "Airbus A350-900",
+    "business": {
+      "rows": [1, 2, 3, 4, 5, 6],
+      "seats_per_row": ["A", "C", "D", "F"],
+      "occupied": ["1A", "1C", "2D", "3F", "4A", "5C", "6D"],
+      "premium": ["1A", "1C", "1D", "1F"]
+    },
+    "economy": {
+      "rows": [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F", "G", "H", "J"],
+      "occupied": ["7A", "8B", "9C", "10D", "11E", "12F", "13G", "14H", "15J", "16A", "17B", "18C", "19D", "20E", "21F", "22G", "23H"],
+      "exit_rows": [9, 20],
+      "economy_plus_rows": [7, 8, 9, 10]
+    }
+  },
+  "FLT-324": {
+    "aircraft": "Boeing 737-800",
+    "business": {
+      "rows": [1, 2, 3],
+      "seats_per_row": ["A", "B", "C", "D"],
+      "occupied": ["1A", "2B", "3D"],
+      "premium": ["1A", "1B", "1C", "1D"]
+    },
+    "economy": {
+      "rows": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F"],
+      "occupied": ["4A", "5B", "6C", "7D", "8E", "9F", "10A", "11B", "12C", "13D"],
+      "exit_rows": [6, 14],
+      "economy_plus_rows": [4, 5, 6]
+    }
+  },
+  "FLT-567": {
+    "aircraft": "Airbus A321neo",
+    "business": {
+      "rows": [1, 2, 3, 4],
+      "seats_per_row": ["A", "B", "C", "D"],
+      "occupied": ["1A", "2B", "3C"],
+      "premium": ["1A", "1B", "1C", "1D"]
+    },
+    "economy": {
+      "rows": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F"],
+      "occupied": ["5A", "6B", "7C", "8D", "9E", "10F", "11A"],
+      "exit_rows": [7, 15],
+      "economy_plus_rows": [5, 6, 7, 8]
+    }
+  },
+  "FLT-701": {
+    "aircraft": "Boeing 777-200ER",
+    "business": {
+      "rows": [1, 2, 3, 4, 5],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F"],
+      "occupied": ["1A", "1B", "2C", "3D", "4E", "5F"],
+      "premium": ["1A", "1B", "1C", "1D", "1E", "1F"]
+    },
+    "economy": {
+      "rows": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F", "G", "H", "J"],
+      "occupied": ["6A", "7B", "8C", "9D", "10E", "11F", "12G", "13H", "14J", "15A"],
+      "exit_rows": [8, 17],
+      "economy_plus_rows": [6, 7, 8, 9]
+    }
+  },
+  "FLT-445": {
+    "aircraft": "Airbus A320",
+    "business": {
+      "rows": [1, 2, 3],
+      "seats_per_row": ["A", "B", "C", "D"],
+      "occupied": ["1A", "2B"],
+      "premium": ["1A", "1B", "1C", "1D"]
+    },
+    "economy": {
+      "rows": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F"],
+      "occupied": ["4A", "5B", "6C", "7D", "8E", "9F", "10A", "11B"],
+      "exit_rows": [6, 12],
+      "economy_plus_rows": [4, 5, 6]
+    }
+  },
+  "FLT-198": {
+    "aircraft": "Boeing 787-10 Dreamliner",
+    "business": {
+      "rows": [1, 2, 3, 4, 5, 6],
+      "seats_per_row": ["A", "C", "D", "G"],
+      "occupied": ["1A", "2C", "3D", "4G", "5A", "6C"],
+      "premium": ["1A", "1C", "1D", "1G"]
+    },
+    "economy": {
+      "rows": [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F", "G", "H", "J"],
+      "occupied": ["7A", "8B", "9C", "10D", "11E", "12F", "13G", "14H", "15J", "16A", "17B"],
+      "exit_rows": [9, 21],
+      "economy_plus_rows": [7, 8, 9, 10]
+    }
+  },
+  "FLT-833": {
+    "aircraft": "Airbus A321neo",
+    "business": {
+      "rows": [1, 2, 3, 4],
+      "seats_per_row": ["A", "B", "C", "D"],
+      "occupied": ["1A", "2B", "3C", "4D"],
+      "premium": ["1A", "1B", "1C", "1D"]
+    },
+    "economy": {
+      "rows": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F"],
+      "occupied": ["5A", "6B", "7C", "8D", "9E", "10F", "11A", "12B"],
+      "exit_rows": [7, 15],
+      "economy_plus_rows": [5, 6, 7, 8]
+    }
+  },
+  "FLT-912": {
+    "aircraft": "Airbus A380",
+    "business": {
+      "rows": [1, 2, 3, 4, 5, 6, 7, 8],
+      "seats_per_row": ["A", "B", "D", "E"],
+      "occupied": ["1A", "2B", "3D", "4E", "5A", "6B"],
+      "premium": ["1A", "1B", "1D", "1E"]
+    },
+    "economy": {
+      "rows": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K"],
+      "occupied": ["9A", "10B", "11C", "12D", "13E", "14F", "15G", "16H", "17J", "18K", "19A"],
+      "exit_rows": [11, 25],
+      "economy_plus_rows": [9, 10, 11, 12]
+    }
+  },
+  "FLT-656": {
+    "aircraft": "Boeing 737-900",
+    "business": {
+      "rows": [1, 2, 3],
+      "seats_per_row": ["A", "B", "C", "D"],
+      "occupied": ["1A", "2B", "3C"],
+      "premium": ["1A", "1B", "1C", "1D"]
+    },
+    "economy": {
+      "rows": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      "seats_per_row": ["A", "B", "C", "D", "E", "F"],
+      "occupied": ["4A", "5B", "6C", "7D", "8E", "9F", "10A"],
+      "exit_rows": [6, 14],
+      "economy_plus_rows": [4, 5, 6]
+    }
+  }
+}

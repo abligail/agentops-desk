@@ -8,6 +8,17 @@ from pydantic import BaseModel
 import string
 from dotenv import load_dotenv
 
+# Import data loader module for accessing flight, seat, and meal data
+from agents_demo.data_loader import (
+    get_flight_by_number,
+    get_seats_by_flight,
+    get_meals_by_route_and_class,
+    check_seat_occupied,
+    get_available_seats,
+    validate_seat_number,
+    get_special_dietary_options,
+)
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -189,8 +200,35 @@ async def faq_lookup_tool(question: str) -> str:
     description_override="Lookup status for a flight."
 )
 async def flight_status_tool(flight_number: str) -> str:
-    """Lookup the status for a flight."""
-    return f"Flight {flight_number} is on time and scheduled to depart at gate A10."
+    """Lookup the status for a flight using real flight data."""
+    flight = get_flight_by_number(flight_number)
+
+    if not flight:
+        return f"Flight {flight_number} not found in our system. Please verify the flight number."
+
+    status = flight.get("status", "unknown")
+    gate = flight.get("gate", "TBA")
+    departure = flight.get("departure_city", flight.get("departure", ""))
+    arrival = flight.get("arrival_city", flight.get("arrival", ""))
+    departure_time = flight.get("departure_time", "")
+    aircraft = flight.get("aircraft", "")
+
+    # Format departure time (show only time part if available)
+    time_str = ""
+    if departure_time:
+        try:
+            # Extract time from ISO format (e.g., "2025-12-18T08:30:00")
+            time_part = departure_time.split("T")[1] if "T" in departure_time else ""
+            if time_part:
+                time_str = f" at {time_part[:5]}"  # HH:MM format
+        except:
+            pass
+
+    return (
+        f"Flight {flight_number} from {departure} to {arrival} "
+        f"is {status.replace('_', ' ')} and scheduled to depart at gate {gate}{time_str}. "
+        f"Aircraft: {aircraft}."
+    )
 
 @function_tool(
     name_override="baggage_tool",
@@ -204,6 +242,106 @@ async def baggage_tool(query: str) -> str:
 	if "allowance" in q:
 		return "One carry-on and one checked bag (up to 50 lbs) are included."
 	return "Please provide details about your baggage inquiry."
+
+
+@function_tool(
+    name_override="check_seat_availability",
+    description_override="Check available seats for a specific flight and cabin class.",
+)
+async def check_seat_availability_tool(
+    context: RunContextWrapper[AirlineAgentContext],
+    flight_number: str | None = None,
+    cabin_class: str | None = None,
+    preference: str | None = None,
+) -> str:
+	"""
+	Check seat availability for a flight.
+
+	Args:
+		flight_number: Flight number (uses context if not provided)
+		cabin_class: "business" or "economy" (optional filter)
+		preference: Seat preference like "window", "aisle", "exit row" (optional)
+
+	Returns:
+		Information about available seats
+	"""
+	# Use flight number from context if not provided
+	flight_num = flight_number or context.context.flight_number
+
+	if not flight_num:
+		return "Please provide a flight number to check seat availability."
+
+	# Verify flight exists
+	flight = get_flight_by_number(flight_num)
+	if not flight:
+		return f"Flight {flight_num} not found in our system."
+
+	# Get seat layout
+	seat_layout = get_seats_by_flight(flight_num)
+	if not seat_layout:
+		return f"Seat information not available for flight {flight_num}."
+
+	# Normalize cabin class
+	if cabin_class:
+		cabin_class = cabin_class.lower()
+		if cabin_class not in ["business", "economy"]:
+			return "Please specify 'business' or 'economy' for cabin class."
+
+	# Get available seats
+	available_seats = get_available_seats(flight_num, cabin_class)
+
+	if not available_seats:
+		cabin_info = f" in {cabin_class} class" if cabin_class else ""
+		return f"No seats currently available{cabin_info} on flight {flight_num}."
+
+	# Filter by preference if specified
+	recommended_seats = []
+	if preference and available_seats:
+		pref_lower = preference.lower()
+
+		for seat in available_seats:
+			seat_letter = ''.join(filter(str.isalpha, seat))
+			row_num_str = ''.join(filter(str.isdigit, seat))
+
+			try:
+				row_num = int(row_num_str)
+
+				# Check preferences
+				if "window" in pref_lower and seat_letter in ["A", "F", "K"]:
+					recommended_seats.append(seat)
+				elif "aisle" in pref_lower and seat_letter in ["C", "D", "G", "H"]:
+					recommended_seats.append(seat)
+				elif "exit" in pref_lower or "legroom" in pref_lower:
+					# Check if it's an exit row
+					for cabin in ["business", "economy"]:
+						cabin_data = seat_layout.get(cabin, {})
+						exit_rows = cabin_data.get("exit_rows", [])
+						if row_num in exit_rows:
+							recommended_seats.append(seat)
+							break
+			except:
+				continue
+
+	# Format response
+	cabin_info = f" {cabin_class.title()}" if cabin_class else ""
+	total_available = len(available_seats)
+
+	response = f"Flight {flight_num} - {cabin_info} Seat Availability:\n"
+	response += f"Total available seats: {total_available}\n"
+
+	if recommended_seats:
+		response += f"\nRecommended seats based on your '{preference}' preference:\n"
+		response += ", ".join(recommended_seats[:10])  # Show first 10
+		if len(recommended_seats) > 10:
+			response += f" (and {len(recommended_seats) - 10} more)"
+	else:
+		# Show sample of available seats
+		sample_seats = available_seats[:15]
+		response += f"\nSample available seats: {', '.join(sample_seats)}"
+		if len(available_seats) > 15:
+			response += f" (and {len(available_seats) - 15} more)"
+
+	return response
 
 
 @function_tool(
@@ -236,12 +374,73 @@ async def record_meal_preference(
 async def check_menu_options(
     context: RunContextWrapper[AirlineAgentContext],
 ) -> str:
-    """Return a small, deterministic menu for the demo."""
-    flight_hint = context.context.flight_number or "the current flight"
+    """Return meal options based on flight route and cabin class from real meal data."""
+    flight_number = context.context.flight_number
+
+    if not flight_number:
+        return "Please provide your flight number to check available meal options."
+
+    # Get flight details to determine route type
+    flight = get_flight_by_number(flight_number)
+
+    if not flight:
+        return f"Flight {flight_number} not found. Unable to retrieve meal options."
+
+    route_type = flight.get("route_type", "domestic")
+
+    # Try to determine cabin class from seat number if available
+    # Default to economy for general menu display
+    cabin_class = "economy"
+    seat_number = context.context.seat_number
+
+    if seat_number:
+        seat_layout = get_seats_by_flight(flight_number)
+        if seat_layout:
+            # Check if seat is in business class
+            business_rows = seat_layout.get("business", {}).get("rows", [])
+            try:
+                row_num = int(''.join(filter(str.isdigit, seat_number)))
+                if row_num in business_rows:
+                    cabin_class = "business"
+            except:
+                pass
+
+    # Get meal options for this route type and cabin class
+    meals = get_meals_by_route_and_class(route_type, cabin_class)
+
+    if not meals:
+        return f"Unable to retrieve meal options for {route_type} {cabin_class} class."
+
+    # Format meal options
+    meal_list = []
+    for i, meal in enumerate(meals, 1):
+        meal_name = meal.get("name", "Unknown")
+        dietary_tags = meal.get("dietary_tags", [])
+
+        dietary_info = ""
+        if dietary_tags:
+            dietary_info = f" ({', '.join(dietary_tags)})"
+
+        meal_list.append(f"{i}) {meal_name}{dietary_info}")
+
+    # Get special dietary options
+    special_options = get_special_dietary_options()
+    special_info = []
+
+    if special_options:
+        for key in ["nut_free", "low_sodium", "kosher", "halal"]:
+            if key in special_options:
+                opt = special_options[key]
+                desc = opt.get("description", "")
+                if desc:
+                    special_info.append(desc)
+
+    meals_text = "\n".join(meal_list)
+    special_text = " ".join(special_info[:2]) if special_info else "Special dietary requests available upon advance notice."
+
     return (
-        f"For {flight_hint}, we can offer: "
-        "1) Grilled chicken with rice, 2) Vegetarian pasta, 3) Gluten-free snack box, "
-        "4) Vegan tofu bowl. We can also provide nut-free and low-sodium options on request."
+        f"For flight {flight_number} ({route_type.title()} - {cabin_class.title()} Class), "
+        f"we offer the following meal options:\n\n{meals_text}\n\n{special_text}"
     )
 
 
@@ -297,14 +496,37 @@ async def fetch_customer_profile(
 # ======================================
 
 async def on_seat_booking_handoff(context: RunContextWrapper[AirlineAgentContext]) -> None:
-    #=======================================================================================
-    # Set flight and confirmation numbers for demo purposes
-    # In production, these should be set from real or simulated user data
-    #======================================================================================
+    """
+    Set flight and confirmation numbers when handed off to the seat booking agent.
+    Only sets values if they are not already present (to avoid overwriting real data).
+    Uses real flight numbers from the flight database instead of random generation.
+    """
+    ctx = context.context
 
-    """Set a random flight number when handed off to the seat booking agent."""
-    context.context.flight_number = f"FLT-{random.randint(100, 999)}"
-    context.context.confirmation_number = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    # Only set flight_number if not already present
+    if not ctx.flight_number:
+        # Try to get from customer profile first
+        if ctx.account_number:
+            profile = _get_profile_by_account(ctx.account_number)
+            if profile and profile.get("flight_number"):
+                ctx.flight_number = profile["flight_number"]
+
+        # If still no flight number, use a default real flight from database
+        if not ctx.flight_number:
+            # Use FLT-238 as default (exists in flights.json)
+            ctx.flight_number = "FLT-238"
+
+    # Only set confirmation_number if not already present
+    if not ctx.confirmation_number:
+        # Try to get from customer profile first
+        if ctx.account_number:
+            profile = _get_profile_by_account(ctx.account_number)
+            if profile and profile.get("confirmation_number"):
+                ctx.confirmation_number = profile["confirmation_number"]
+
+        # If still no confirmation number, generate a new one
+        if not ctx.confirmation_number:
+            ctx.confirmation_number = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 # =========================
 # GUARDRAILS

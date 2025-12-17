@@ -23,28 +23,32 @@ export function Chat({
   onSendMessage,
   isLoading,
   onFeedback,
+  conversationId,
 }: ChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [inputText, setInputText] = useState("");
   const [isComposing, setIsComposing] = useState(false);
   const [showSeatMap, setShowSeatMap] = useState(false);
   const [selectedSeat, setSelectedSeat] = useState<string | undefined>(undefined);
+  const [seenSeatMapTriggers, setSeenSeatMapTriggers] = useState(0);
 
   // Auto-scroll to bottom when messages or loading indicator change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
   }, [messages, isLoading]);
 
-  // Watch for special seat map trigger message (anywhere in list) and only if a seat has not been picked yet
+  // Watch for special seat map trigger messages; open the selector once per trigger.
   useEffect(() => {
-    const hasTrigger = messages.some(
+    const triggerCount = messages.filter(
       (m) => m.role === "assistant" && m.content === "DISPLAY_SEAT_MAP"
-    );
-    // Show map if trigger exists and seat not chosen yet
-    if (hasTrigger && !selectedSeat) {
+    ).length;
+
+    if (triggerCount > seenSeatMapTriggers) {
+      setSeenSeatMapTriggers(triggerCount);
+      setSelectedSeat(undefined);
       setShowSeatMap(true);
     }
-  }, [messages, selectedSeat]);
+  }, [messages, seenSeatMapTriggers]);
 
   const handleSend = useCallback(() => {
     if (!inputText.trim()) return;
@@ -137,6 +141,7 @@ export function Chat({
           <div className="flex justify-start mb-5">
             <div className="mr-4 rounded-[16px] rounded-bl-[4px] md:mr-24">
               <SeatMap
+                conversationId={conversationId}
                 onSeatSelect={handleSeatSelect}
                 selectedSeat={selectedSeat}
               />

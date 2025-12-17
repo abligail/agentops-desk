@@ -33,6 +33,8 @@ from .main_qwen import myRunConfig
 from .storage import JsonConversationStore
 from .telemetry import Telemetry
 from .evaluators import evaluate_and_score_trace
+from .data_loader import get_seats_by_flight
+from .seat_assignments import seat_assignment_store
 
 
 """
@@ -133,6 +135,22 @@ class FeedbackRequest(BaseModel):
 	trace_id: str
 	score: float
 	comment: Optional[str] = None
+
+
+class SeatMapSection(BaseModel):
+	rows: List[int] = Field(default_factory=list)
+	seats_per_row: List[str] = Field(default_factory=list)
+	occupied: List[str] = Field(default_factory=list)
+	exit_rows: List[int] = Field(default_factory=list)
+	premium: List[str] = Field(default_factory=list)
+
+
+class SeatMapResponse(BaseModel):
+	conversation_id: str
+	flight_number: str
+	aircraft: Optional[str] = None
+	sections: Dict[str, SeatMapSection]
+	current_seat: Optional[str] = None
 
 #****************************************************************************************************
 # ===================================================================================================
@@ -646,6 +664,61 @@ async def feedback_endpoint(req: FeedbackRequest):
 	)
 
 	return {"status": "ok", "sent_to_langfuse": sent_to_langfuse}
+
+
+@app.get("/api/seatmap", response_model=SeatMapResponse)
+async def seatmap_endpoint(conversation_id: str):
+	"""Return a data-driven seat map for the current conversation's flight."""
+	state = conversation_store.get(conversation_id)
+	if state is None:
+		raise HTTPException(status_code=404, detail="Conversation not found")
+
+	ctx = state.get("context")
+	flight_number = getattr(ctx, "flight_number", None) if ctx is not None else None
+	if not flight_number and isinstance(ctx, dict):
+		flight_number = ctx.get("flight_number")
+	if not flight_number:
+		raise HTTPException(status_code=400, detail="No flight number available in conversation context")
+
+	seat_layout = get_seats_by_flight(str(flight_number))
+	if not seat_layout:
+		raise HTTPException(status_code=404, detail=f"Seat map not available for flight {flight_number}")
+
+	reserved = seat_assignment_store.occupied_seats(flight_number=str(flight_number))
+
+	def _seat_sort_key(seat: str):
+		row_str = "".join(ch for ch in seat if ch.isdigit())
+		letter = "".join(ch for ch in seat if ch.isalpha())
+		try:
+			row = int(row_str) if row_str else 0
+		except Exception:
+			row = 0
+		return (row, letter)
+
+	sections: Dict[str, SeatMapSection] = {}
+	for cabin in ("business", "economy"):
+		cabin_data = seat_layout.get(cabin, {}) if isinstance(seat_layout, dict) else {}
+		base_occupied = set(cabin_data.get("occupied", []) or [])
+		all_occupied = sorted(base_occupied | reserved, key=_seat_sort_key)
+		sections[cabin] = SeatMapSection(
+			rows=cabin_data.get("rows", []) or [],
+			seats_per_row=cabin_data.get("seats_per_row", []) or [],
+			occupied=all_occupied,
+			exit_rows=cabin_data.get("exit_rows", []) or [],
+			premium=cabin_data.get("premium", []) or [],
+		)
+
+	current_seat = getattr(ctx, "seat_number", None) if ctx is not None else None
+	if not current_seat and isinstance(ctx, dict):
+		current_seat = ctx.get("seat_number")
+
+	return SeatMapResponse(
+		conversation_id=conversation_id,
+		flight_number=str(flight_number),
+		aircraft=seat_layout.get("aircraft") if isinstance(seat_layout, dict) else None,
+		sections=sections,
+		current_seat=current_seat,
+	)
 
 
 dist = files("agents_demo").joinpath("ui").joinpath("out")

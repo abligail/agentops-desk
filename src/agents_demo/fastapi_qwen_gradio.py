@@ -52,68 +52,67 @@ import nest_asyncio
 #=========================================
 load_dotenv()
 
-# Set Langfuse environment variables if not already set
-if not os.getenv("LANGFUSE_PUBLIC_KEY"):
-    os.environ["LANGFUSE_PUBLIC_KEY"] = "pk-lf-6dc235c0-ed5f-4059-a194-47aaf65cac4a"
-if not os.getenv("LANGFUSE_SECRET_KEY"):
-    os.environ["LANGFUSE_SECRET_KEY"] = "sk-lf-b1c698d3-40fe-4023-b5b5-5844f20d56d9"
-if not os.getenv("LANGFUSE_HOST"):
-    os.environ["LANGFUSE_HOST"] = "https://us.cloud.langfuse.com"
-
 nest_asyncio.apply()
 
 OpenAIAgentsInstrumentor().instrument()
 
-# Initialize Langfuse client 
-langfuse = get_client()
-if langfuse.auth_check(): # Verify connection
-    print("Langfuse client is authenticated and ready!")
+# Initialize Langfuse client (optional - controlled by env vars)
+class _NoopLangfuse:
+    def auth_check(self) -> bool:
+        return False
+
+    def create_score(self, *args, **kwargs):
+        return None
+
+    def get_current_trace_id(self):
+        return None
+
+    def update_current_trace(self, *args, **kwargs):
+        return None
+
+    def flush(self):
+        return None
+
+
+langfuse_public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+langfuse_secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+
+if langfuse_public_key and langfuse_secret_key:
+    try:
+        langfuse = get_client()
+        if langfuse.auth_check():  # Verify connection
+            print("Langfuse client is authenticated and ready!")
+        else:
+            print("Langfuse authentication failed. Please check your credentials and host.")
+    except Exception as exc:
+        print(f"Langfuse initialization failed: {exc}. Running without remote tracing.")
+        langfuse = _NoopLangfuse()
 else:
-    print("Authentication failed. Please check your credentials and host.")
+    print("Langfuse not configured. Set LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY to enable tracing.")
+    langfuse = _NoopLangfuse()
 #==============end of langfuse ====================================================
 
 """  
 https://bailian.console.aliyun.com/?tab=model#/model-market/detail/qwen3-next-80b-a3b-instruct
 """
-BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-API_KEY = "sk-f55837467fd543a49cfc5cecd003d788"  #quick testing, don’t leak the key
+OpenAIModel = os.getenv("USE_OPENAI_MODEL", "false").lower() == "true"
+OutputSteaming = os.getenv("OUTPUT_STREAMING", "false").lower() == "true"
 
-# MODEL_NAME = "qwen3-next-80b-a3b-thinking" #unsupport function call?
-MODEL_NAME = "qwen3-next-80b-a3b-instruct" #no extra body
+if OpenAIModel:
+    BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    API_KEY = os.getenv("OPENAI_API_KEY", "")
+    MODEL_NAME = os.getenv("OPENAI_MODEL_NAME", "gpt-4.1")
+else:
+    BASE_URL = os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    API_KEY = os.getenv("QWEN_API_KEY", "")
+    MODEL_NAME = os.getenv("QWEN_MODEL_NAME", "qwen3-next-80b-a3b-instruct")
 
-MODEL_NAME = "qwen3-30b-a3b-instruct-2507"  #no extra body
-# MODEL_NAME = "qwen3-30b-a3b-thinking-2507"  #unsupport function call?
-# MODEL_NAME = "qwen3-30b-a3b"  #with extra body
-#MODEL_NAME = "qwen3-8b"  
-#MODEL_NAME = "qwen3-14b"  
-#MODEL_NAME = "qwen3-32b" 
+# qwen model settings (enable_thinking)
+mt = ModelSettings(extra_body={"enable_thinking": True})
 
-
-"""    
-BASE_URL = os.getenv("EXAMPLE_BASE_URL") or ""
-API_KEY = os.getenv("EXAMPLE_API_KEY") or ""
-MODEL_NAME = os.getenv("EXAMPLE_MODEL_NAME") or ""
-""" 
-# qwen model
-# streaming: any model and any thinking value
-# nonstreaming:  for Qwen3-8B,"enable_thinking":True and OutputSteaming=True will work
-#mt = ModelSettings(extra_body = {"enable_thinking":False}) 
-mt = ModelSettings(extra_body = {"enable_thinking":True}) #must be true for model with thinking string 
-OpenAIModel=False  #qwen model
-OutputSteaming=False  #streaming output,can be False for qwen3-next-80b-a3b-instruct  
-
-# openai model
-#OpenAIModel=True  #openai model
-#OutputSteaming=False  #streaming output, True or False for openai 
-
-if OpenAIModel:  ##quick testing, don’t leak the key
-  BASE_URL = "https://api.openai.com/v1"
-  API_KEY = "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"
-  MODEL_NAME = "gpt-4o"
-
-if not BASE_URL or not API_KEY or not MODEL_NAME:
+if not API_KEY:
     raise ValueError(
-        "Please set EXAMPLE_BASE_URL, EXAMPLE_API_KEY, EXAMPLE_MODEL_NAME via env var or code."
+        "Missing API key. Please set OPENAI_API_KEY (USE_OPENAI_MODEL=true) or QWEN_API_KEY (USE_OPENAI_MODEL=false)."
     )
 
 # setup OpenAI client for Qwen model or OpenAI model

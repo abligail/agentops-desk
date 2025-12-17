@@ -1653,5 +1653,205 @@
     ],
     "updated_at": 1765856150.6714597,
     "created_at": 1765856001.8777184
+  },
+  "ca5adf13362947c68e0b63d013709683": {
+    "input_items": [
+      {
+        "role": "assistant",
+        "content": "For context, here is the conversation so far between the user and the previous agent:\n<CONVERSATION HISTORY>\n1. user: 我要吃饭\n2. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_NtRNQ1dW7bB0U7UyNxwy1Zr3\", \"name\": \"transfer_to_food_service_agent\", \"id\": \"__fake_id__\"}\n3. function_call_output: {\"call_id\": \"call_NtRNQ1dW7bB0U7UyNxwy1Zr3\", \"output\": \"{\\\"assistant\\\": \\\"Food Service Agent\\\"}\"}\n4. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_NtRNQ1dW7bB0U7UyNxwy1Zr3\", \"name\": \"transfer_to_food_service_agent\", \"id\": \"__fake_id__\"}\n5. function_call_output: {\"call_id\": \"call_NtRNQ1dW7bB0U7UyNxwy1Zr3\", \"output\": \"{\\\"assistant\\\": \\\"Food Service Agent\\\"}\"}\n6. assistant: [{\"annotations\": [], \"text\": \"您好！请问您有任何食物过敏或饮食方面的特殊需求吗？另外，能否提供您的座位号，以便为您推荐和确认机上的餐食选项？\", \"type\": \"output_text\", \"logprobs\": []}]\n7. user: 啊我要选座位\n8. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_ZTGnElCvwRuZ6ZKodNn4DeP6\", \"name\": \"transfer_to_triage_agent\", \"id\": \"__fake_id__\"}\n9. function_call_output: {\"call_id\": \"call_ZTGnElCvwRuZ6ZKodNn4DeP6\", \"output\": \"{\\\"assistant\\\": \\\"Triage Agent\\\"}\"}\n10. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_ZTGnElCvwRuZ6ZKodNn4DeP6\", \"name\": \"transfer_to_triage_agent\", \"id\": \"__fake_id__\"}\n11. function_call_output: {\"call_id\": \"call_ZTGnElCvwRuZ6ZKodNn4DeP6\", \"output\": \"{\\\"assistant\\\": \\\"Triage Agent\\\"}\"}\n12. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_M94oQbEtDrxNKiN6Kg1TAAo8\", \"name\": \"transfer_to_seat_booking_agent\", \"id\": \"__fake_id__\"}\n13. function_call_output: {\"call_id\": \"call_M94oQbEtDrxNKiN6Kg1TAAo8\", \"output\": \"{\\\"assistant\\\": \\\"Seat Booking Agent\\\"}\"}\n</CONVERSATION HISTORY>"
+      },
+      {
+        "arguments": "{}",
+        "call_id": "call_ZTGnElCvwRuZ6ZKodNn4DeP6",
+        "name": "transfer_to_triage_agent",
+        "type": "function_call",
+        "id": "__fake_id__"
+      },
+      {
+        "call_id": "call_ZTGnElCvwRuZ6ZKodNn4DeP6",
+        "output": "{\"assistant\": \"Triage Agent\"}",
+        "type": "function_call_output"
+      },
+      {
+        "arguments": "{}",
+        "call_id": "call_M94oQbEtDrxNKiN6Kg1TAAo8",
+        "name": "transfer_to_seat_booking_agent",
+        "type": "function_call",
+        "id": "__fake_id__"
+      },
+      {
+        "call_id": "call_M94oQbEtDrxNKiN6Kg1TAAo8",
+        "output": "{\"assistant\": \"Seat Booking Agent\"}",
+        "type": "function_call_output"
+      },
+      {
+        "id": "__fake_id__",
+        "content": [
+          {
+            "annotations": [],
+            "text": "请问您的订座确认号是 JR84KP 对吗？为了帮助您选座，请告诉我您想要的座位号，或者您需要查看座位示意图来选择座位吗？",
+            "type": "output_text",
+            "logprobs": []
+          }
+        ],
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      },
+      {
+        "content": "查看座位示意图",
+        "role": "user"
+      },
+      {
+        "arguments": "{}",
+        "call_id": "call_wzFsMMdQGBE10GA83jJJiSS5",
+        "name": "display_seat_map",
+        "type": "function_call",
+        "id": "__fake_id__"
+      },
+      {
+        "call_id": "call_wzFsMMdQGBE10GA83jJJiSS5",
+        "output": "DISPLAY_SEAT_MAP",
+        "type": "function_call_output"
+      },
+      {
+        "id": "__fake_id__",
+        "content": [
+          {
+            "annotations": [],
+            "text": "已为您打开座位示意图。请在座位图中点击您喜欢的座位号，或者告诉我您想要的具体座位号，我会帮您完成选座。",
+            "type": "output_text",
+            "logprobs": []
+          }
+        ],
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "context": {
+      "passenger_name": null,
+      "confirmation_number": "JR84KP",
+      "seat_number": null,
+      "flight_number": "FLT-892",
+      "account_number": "67234891",
+      "meal_preference": null,
+      "dietary_restrictions": null,
+      "special_requests": null,
+      "meal_status": "not_requested"
+    },
+    "current_agent": "Seat Booking Agent",
+    "trace_history": [
+      {
+        "trace_id": "a04414f89cdf452898154b16b4392e47",
+        "timestamp": 1765950533018.681,
+        "agent": "Food Service Agent",
+        "messages": [
+          {
+            "id": "5fdc3d966cd3459585904103e3819756",
+            "content": "您好！请问您有任何食物过敏或饮食方面的特殊需求吗？另外，能否提供您的座位号，以便为您推荐和确认机上的餐食选项？",
+            "agent": "Food Service Agent",
+            "trace_id": "a04414f89cdf452898154b16b4392e47",
+            "timestamp": 1765950539158.755,
+            "feedback": null
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "e591130f7cec480bab3f83482ad9f502",
+            "name": "Relevance Guardrail",
+            "input": "我要吃饭",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1765950539158.755
+          },
+          {
+            "id": "ef63b0991efb48dbb3557cdab77f9873",
+            "name": "Jailbreak Guardrail",
+            "input": "我要吃饭",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1765950539159.6838
+          }
+        ]
+      },
+      {
+        "trace_id": "fab52f9c12044de4a74c3b1e049d7e4c",
+        "timestamp": 1765950892457.839,
+        "agent": "Seat Booking Agent",
+        "messages": [
+          {
+            "id": "a0f440edc8f6418eb14f22f4a60762ef",
+            "content": "请问您的订座确认号是 JR84KP 对吗？为了帮助您选座，请告诉我您想要的座位号，或者您需要查看座位示意图来选择座位吗？",
+            "agent": "Seat Booking Agent",
+            "trace_id": "fab52f9c12044de4a74c3b1e049d7e4c",
+            "timestamp": 1765950898460.908,
+            "feedback": null
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "336520111a5e44c7b3185635da8f0f08",
+            "name": "Relevance Guardrail",
+            "input": "啊我要选座位",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1765950898460.908
+          },
+          {
+            "id": "d188bfa866cc42459ff50d9fae7edbbc",
+            "name": "Jailbreak Guardrail",
+            "input": "啊我要选座位",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1765950898460.908
+          }
+        ]
+      },
+      {
+        "trace_id": "a9cee7d5d57d4001a7d5e3acd091e7b8",
+        "timestamp": 1765950912956.9436,
+        "agent": "Seat Booking Agent",
+        "messages": [
+          {
+            "id": "bb5a83a5af61441dbe8f7f42302eaf21",
+            "content": "DISPLAY_SEAT_MAP",
+            "agent": "Seat Booking Agent",
+            "trace_id": "a9cee7d5d57d4001a7d5e3acd091e7b8",
+            "timestamp": 1765950917182.6206,
+            "feedback": null
+          },
+          {
+            "id": "0607d4205eb545acbe92e584cd33872d",
+            "content": "已为您打开座位示意图。请在座位图中点击您喜欢的座位号，或者告诉我您想要的具体座位号，我会帮您完成选座。",
+            "agent": "Seat Booking Agent",
+            "trace_id": "a9cee7d5d57d4001a7d5e3acd091e7b8",
+            "timestamp": 1765950917182.6206,
+            "feedback": null
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "a692f8eca8d64a5a8a61d5ae7b5d8167",
+            "name": "Relevance Guardrail",
+            "input": "查看座位示意图",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1765950917182.6206
+          },
+          {
+            "id": "508090f7fe024ef0b1ec467362967970",
+            "name": "Jailbreak Guardrail",
+            "input": "查看座位示意图",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1765950917182.6206
+          }
+        ]
+      }
+    ],
+    "feedback": [],
+    "updated_at": 1765950917.1826205,
+    "created_at": 1765950521.539292
   }
 }

@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 # Import data loader module for accessing flight, seat, and meal data
 from agents_demo.data_loader import (
+    load_flights_data,
     get_flight_by_number,
     get_seats_by_flight,
     get_meals_by_route_and_class,
@@ -18,6 +19,7 @@ from agents_demo.data_loader import (
     validate_seat_number,
     get_special_dietary_options,
 )
+from .seat_assignments import seat_assignment_store
 
 
 # Load environment variables from .env file
@@ -157,6 +159,17 @@ def _get_profile_by_account(account_number: str | None) -> dict[str, str] | None
 		return None
 	return next((p for p in CUSTOMER_PROFILES if p.get("account_number") == account_number), None)
 
+def _pick_real_flight_number() -> str:
+	"""Pick a real flight_number from flights.json for demo consistency."""
+	try:
+		flights = load_flights_data()
+		candidates = [f.get("flight_number") for f in flights if f.get("flight_number")]
+		if candidates:
+			return random.choice(candidates)
+	except Exception:
+		pass
+	return "FLT-238"
+
 def create_initial_context() -> AirlineAgentContext:
 	"""
 	Factory for a new AirlineAgentContext.
@@ -289,6 +302,10 @@ async def check_seat_availability_tool(
 
 	# Get available seats
 	available_seats = get_available_seats(flight_num, cabin_class)
+	# Remove seats already reserved in the persistent assignment store.
+	reserved = seat_assignment_store.occupied_seats(flight_number=flight_num)
+	if reserved:
+		available_seats = [s for s in available_seats if s not in reserved]
 
 	if not available_seats:
 		cabin_info = f" in {cabin_class} class" if cabin_class else ""
@@ -543,12 +560,18 @@ guardrail_agent = Agent(
     
     name="Relevance Guardrail",
     instructions=(
-        "Determine if the user's message is highly unrelated to a normal customer service "
-        "conversation with an airline (flights, bookings, baggage, check-in, flight status, policies, loyalty programs, etc.). "
-        "Important: You are ONLY evaluating the most recent user message, not any of the previous messages from the chat history"
-        "It is OK for the customer to send messages such as 'Hi' or 'OK' or any other messages that are at all conversational, "
-        "but if the response is non-conversational, it must be somewhat related to airline travel. "
-        "Return is_relevant=True if it is, else False, plus a brief reasoning."
+        "Determine whether the user's **latest** message is relevant to airline customer service.\n\n"
+        "Airline customer service topics include (but are not limited to): flights, bookings, seat changes, baggage, check-in, "
+        "flight status, cancellations/refunds, policies, loyalty programs, AND onboard meal/food service.\n\n"
+        "Meal/food service is considered RELEVANT, even if the user does not explicitly mention the flight, for example:\n"
+        "- 'I want to eat / 我要吃饭'\n"
+        "- 'What meals are available?'\n"
+        "- 'I am allergic to peanuts / 我对花生过敏'\n"
+        "- 'I need a vegetarian/halal/kosher/low-sodium meal'\n\n"
+        "Casual conversational messages like 'Hi' / 'OK' are also relevant.\n\n"
+        "Mark is_relevant=False only if the latest user message is clearly unrelated to airline travel/customer service.\n\n"
+        "Important: You are ONLY evaluating the most recent user message, not the previous chat history. "
+        "Return is_relevant=True if it is relevant, else False, plus brief reasoning."
     ),
     output_type=RelevanceOutput,
 )
@@ -619,10 +642,43 @@ async def update_seat(
     context: RunContextWrapper[AirlineAgentContext], confirmation_number: str, new_seat: str
 ) -> str:
     """Update the seat for a given confirmation number."""
-    context.context.confirmation_number = confirmation_number
-    context.context.seat_number = new_seat
-    assert context.context.flight_number is not None, "Flight number is required"
-    return f"Updated seat to {new_seat} for confirmation number {confirmation_number}"
+    ctx = context.context
+    flight_number = ctx.flight_number
+    if not flight_number:
+        return "Flight number is required to update a seat. Please provide your flight number."
+
+    confirmation = (confirmation_number or "").strip() or (ctx.confirmation_number or "")
+    if not confirmation:
+        return "Confirmation number is required to update a seat. Please provide your confirmation number."
+
+    seat = (new_seat or "").strip().upper()
+    if not seat:
+        return "Please provide a seat number to switch to (e.g., 14C)."
+
+    if not validate_seat_number(flight_number, seat):
+        return f"Seat {seat} is not valid for flight {flight_number}. Please choose a valid seat from the seat map."
+
+    # Seats occupied in the baseline dataset are unavailable.
+    if check_seat_occupied(flight_number, seat):
+        return f"Seat {seat} is already occupied on flight {flight_number}. Please choose a different seat."
+
+    # Seats reserved via the demo seat assignment store are also unavailable.
+    if seat_assignment_store.seat_is_taken(
+        flight_number=flight_number,
+        seat_number=seat,
+        ignore_confirmation=confirmation,
+    ):
+        return f"Seat {seat} has just been reserved by another passenger. Please choose a different seat."
+
+    seat_assignment_store.assign(
+        confirmation_number=confirmation,
+        flight_number=flight_number,
+        seat_number=seat,
+    )
+
+    ctx.confirmation_number = confirmation
+    ctx.seat_number = seat
+    return f"Updated seat to {seat} for confirmation number {confirmation} on flight {flight_number}."
 
 #================================================================================
 # agent send seat map display task to frontend with message
@@ -709,12 +765,30 @@ async def on_cancellation_handoff(
     context: RunContextWrapper[AirlineAgentContext]
 ) -> None:
     """Ensure context has a confirmation and flight number when handing off to cancellation."""
-    if context.context.confirmation_number is None:
-        context.context.confirmation_number = "".join(
-            random.choices(string.ascii_uppercase + string.digits, k=6)
-        )
-    if context.context.flight_number is None:
-        context.context.flight_number = f"FLT-{random.randint(100, 999)}"
+    ctx = context.context
+
+    if not ctx.confirmation_number:
+        if ctx.account_number:
+            profile = _get_profile_by_account(ctx.account_number)
+            if profile and profile.get("confirmation_number"):
+                ctx.confirmation_number = profile["confirmation_number"]
+        if not ctx.confirmation_number:
+            ctx.confirmation_number = "".join(
+                random.choices(string.ascii_uppercase + string.digits, k=6)
+            )
+
+    if ctx.flight_number:
+        if not get_flight_by_number(ctx.flight_number):
+            ctx.flight_number = _pick_real_flight_number()
+        return
+
+    if ctx.account_number:
+        profile = _get_profile_by_account(ctx.account_number)
+        if profile and profile.get("flight_number"):
+            ctx.flight_number = profile["flight_number"]
+
+    if not ctx.flight_number:
+        ctx.flight_number = _pick_real_flight_number()
 
 def cancellation_instructions(
     run_context: RunContextWrapper[AirlineAgentContext], agent: Agent[AirlineAgentContext]

@@ -30,7 +30,7 @@ from .main_qwen import (
 )
 from .main_qwen import OpenAIModel as bOpenAIModel  # True: use OpenAI model; False: use Qwen model
 from .main_qwen import myRunConfig
-from .storage import JsonConversationStore
+from .storage import CompositeConversationStore, JsonConversationStore, PostgresConversationStore
 from .telemetry import Telemetry
 from .evaluators import evaluate_and_score_trace
 from .data_loader import get_seats_by_flight
@@ -178,9 +178,16 @@ class ChatResponse(BaseModel):
 # Persistent conversation store instance
 #===================================================================================
 data_dir = Path(__file__).resolve().parent / "data"
-conversation_store = JsonConversationStore(
-	data_dir / "conversations.json",
-	context_loader=lambda payload: AirlineAgentContext(**payload),
+conversation_store = CompositeConversationStore(
+	PostgresConversationStore(
+		context_loader=lambda payload: AirlineAgentContext(**payload),
+		seed_path=data_dir / "conversations.json",
+	),
+	JsonConversationStore(
+		data_dir / "conversations.json",
+		context_loader=lambda payload: AirlineAgentContext(**payload),
+	),
+	sync_secondary_from_primary=True,
 )
 
 #===================================================================================

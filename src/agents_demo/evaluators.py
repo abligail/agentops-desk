@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from agents import Agent, Runner
-from .main_qwen import qwen_model2, OpenAIModel, myRunConfig
+from .main_qwen import qwen_model2, OpenAIModel, myRunConfig_guardrail
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,8 @@ class EvaluationScore(BaseModel):
 # =========================
 # Evaluator Agent
 # =========================
+
+_evaluator_output_type = EvaluationScore if OpenAIModel else None
 
 evaluator_agent = Agent(
     name="Response Quality Evaluator",
@@ -67,8 +69,38 @@ Provide:
 Be objective and constructive in your evaluation.
 Respond with a json object matching the EvaluationScore schema.
 """,
-    output_type=EvaluationScore,
+    output_type=_evaluator_output_type,
 )
+
+def _coerce_evaluation_output(raw: object) -> EvaluationScore:
+    """Best-effort parse evaluator output when JSON mode is unreliable."""
+    if isinstance(raw, EvaluationScore):
+        return raw
+    if isinstance(raw, dict):
+        try:
+            return EvaluationScore.model_validate(raw)
+        except Exception:
+            pass
+    if isinstance(raw, str):
+        try:
+            return EvaluationScore.model_validate_json(raw)
+        except Exception:
+            pass
+        try:
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                return EvaluationScore.model_validate_json(raw[start : end + 1])
+        except Exception:
+            pass
+    return EvaluationScore(
+        helpfulness=0.5,
+        accuracy=0.5,
+        relevance=0.5,
+        overall_score=0.5,
+        reasoning="fallback",
+        improvement_suggestions=None,
+    )
 
 
 # =========================
@@ -112,10 +144,10 @@ async def evaluate_response(
         # Run evaluator agent
         if OpenAIModel:
             result = await Runner.run(evaluator_agent, eval_prompt)
+            score = result.final_output_as(EvaluationScore)
         else:
-            result = await Runner.run(evaluator_agent, eval_prompt, run_config=myRunConfig)
-
-        score = result.final_output_as(EvaluationScore)
+            result = await Runner.run(evaluator_agent, eval_prompt, run_config=myRunConfig_guardrail)
+            score = _coerce_evaluation_output(getattr(result, "final_output", None))
         logger.info(f"Evaluated response: overall={score.overall_score:.2f}")
         return score
 

@@ -11,6 +11,7 @@ from uuid import uuid4
 import time
 import logging
 import asyncio
+from contextlib import nullcontext
 
 from starlette.staticfiles import StaticFiles
 
@@ -62,6 +63,15 @@ from agents import (
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Enable OpenInference tracing when available.
+try:
+	from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor
+	OpenAIAgentsInstrumentor().instrument()
+	OPENINFERENCE_ENABLED = True
+except Exception as e:
+	logger.info("OpenInference instrumentation unavailable: %s", e)
+	OPENINFERENCE_ENABLED = False
 
 #===================================================================================
 # Initialize Langfuse client for trace management (v3 API)
@@ -246,6 +256,40 @@ def _build_agents_list() -> List[Dict[str, Any]]:
 		make_agent_dict(food_service_agent),
 	]
 
+def _extract_langfuse_trace_id(trace_obj: Any) -> Optional[str]:
+	"""Best-effort extract Langfuse trace id from a trace/span object."""
+	if trace_obj is None:
+		return None
+	for attr in ("trace_id", "id"):
+		value = getattr(trace_obj, attr, None)
+		if isinstance(value, str) and value:
+			return value
+	return None
+
+def _start_otel_span(name: str):
+	"""Start an OpenTelemetry span when tracing is available."""
+	try:
+		from opentelemetry import trace as otel_trace
+	except Exception:
+		return nullcontext()
+
+	tracer = otel_trace.get_tracer(__name__)
+	return tracer.start_as_current_span(name)
+
+def _trace_id_from_span(span: Any) -> Optional[str]:
+	"""Extract the trace id from a span."""
+	if span is None:
+		return None
+	ctx = span.get_span_context()
+	if not ctx or not getattr(ctx, "is_valid", False):
+		return None
+	trace_id = getattr(ctx, "trace_id", None)
+	if isinstance(trace_id, int) and trace_id:
+		return f"{trace_id:032x}"
+	if isinstance(trace_id, str) and trace_id:
+		return trace_id
+	return None
+
 # =========================
 # Background Tasks
 # =========================
@@ -282,28 +326,9 @@ async def run_llm_judge_evaluation(
 async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
 	print(f"Received chat request: conversation_id={req.conversation_id}, message={req.message} ")
 	trace_id = uuid4().hex
+	external_trace_id = trace_id
 	now_ms = time.time() * 1000
-
-	#===================================================================================
-	# Create Langfuse trace for this interaction (v3 API)
-	#===================================================================================
 	langfuse_trace = None
-	if LANGFUSE_ENABLED and langfuse_client:
-		try:
-			# In v3 API, use start_span to create a trace
-			langfuse_trace = langfuse_client.start_span(
-				name="agent_chat_interaction",
-				metadata={
-					"trace_id": trace_id,
-					"conversation_id": req.conversation_id,
-					"user_id": req.conversation_id or "anonymous",
-					"user_message": req.message,
-					"timestamp": now_ms,
-				},
-			)
-			logger.info(f"Created Langfuse trace: {trace_id}")
-		except Exception as e:
-			logger.warning(f"Failed to create Langfuse trace: {e}")
 
 	"""
 	Main chat endpoint for agent orchestration.
@@ -355,18 +380,39 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
 	state["input_items"].append({"content": req.message, "role": "user"})   #input for runner.run
 	old_context = state["context"].model_dump().copy() if hasattr(state["context"], "model_dump") else dict(state["context"])  #context for runner.run
 	guardrail_checks: List[GuardrailCheck] = []
+	otel_trace_id = None
 
 	try:
 		result = None
 
-		#===========================================================================================
-		# check: https://openai.github.io/openai-agents-python/ref/run/#agents.run.Runner.run
-		# run with input(list[TResponseInputItem] ) and context (flight booking context)
-		#===========================================================================================
-		if(bOpenAIModel): #zdjiang added for qwen3
-			result = await Runner.run(current_agent, state["input_items"], context=state["context"])
-		else:
-			result = await Runner.run(current_agent, state["input_items"], context=state["context"], run_config=myRunConfig)
+		with _start_otel_span("agent_chat_interaction") as otel_span:
+			otel_trace_id = _trace_id_from_span(otel_span)
+			if otel_trace_id:
+				trace_id = otel_trace_id
+			if otel_span:
+				otel_span.set_attribute("input", req.message)
+				otel_span.set_attribute("conversation_id", conversation_id)
+				otel_span.set_attribute("user_id", conversation_id or "anonymous")
+
+			#===========================================================================================
+			# check: https://openai.github.io/openai-agents-python/ref/run/#agents.run.Runner.run
+			# run with input(list[TResponseInputItem] ) and context (flight booking context)
+			#===========================================================================================
+			if(bOpenAIModel): #zdjiang added for qwen3
+				result = await Runner.run(current_agent, state["input_items"], context=state["context"])
+			else:
+				result = await Runner.run(current_agent, state["input_items"], context=state["context"], run_config=myRunConfig)
+			if otel_span:
+				try:
+					output_preview = [
+						ItemHelpers.text_message_output(item)
+						for item in result.new_items
+						if isinstance(item, MessageOutputItem)
+					]
+					if output_preview:
+						otel_span.set_attribute("output", output_preview)
+				except Exception:
+					pass
 
 	except InputGuardrailTripwireTriggered as e: #gurdrail tripwire triggered
 		failed = e.guardrail_result.guardrail
@@ -537,7 +583,41 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
 					timestamp=time.time() * 1000,
 				)
 			)
-    
+
+	#==================================================================================================
+	# Resolve trace id: prefer OpenTelemetry (OpenInference) trace id when available.
+	#==================================================================================================
+	if otel_trace_id:
+		trace_id = otel_trace_id
+	else:
+		if LANGFUSE_ENABLED and langfuse_client:
+			try:
+				# Fallback: create Langfuse trace only when no OTel trace is available.
+				langfuse_trace = langfuse_client.start_span(
+					name="agent_chat_interaction",
+					metadata={
+						"external_trace_id": external_trace_id,
+						"conversation_id": req.conversation_id,
+						"user_id": req.conversation_id or "anonymous",
+						"user_message": req.message,
+						"timestamp": now_ms,
+					},
+				)
+				langfuse_trace_id = _extract_langfuse_trace_id(langfuse_trace)
+				if langfuse_trace_id:
+					trace_id = langfuse_trace_id
+					logger.info(
+						"Using Langfuse trace id %s for UI feedback (external=%s)",
+						trace_id,
+						external_trace_id,
+					)
+				logger.info(f"Created Langfuse trace: {trace_id}")
+			except Exception as e:
+				logger.warning(f"Failed to create Langfuse trace: {e}")
+
+	for msg in messages:
+		msg.trace_id = trace_id
+
 	# Check for context updates
 	new_context = state["context"].model_dump()
 	changes = {k: new_context[k] for k in new_context if old_context.get(k) != new_context[k]}

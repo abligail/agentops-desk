@@ -5,6 +5,8 @@ export interface Message {
   agent?: string
   traceId?: string
   feedback?: "positive" | "negative" | null
+  rating?: number | null
+  feedbackComment?: string | null
   timestamp: Date
 }
 

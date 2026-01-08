@@ -109,6 +109,8 @@ class MessageResponse(BaseModel):
 	trace_id: Optional[str] = None
 	timestamp: float
 	feedback: Optional[float] = None
+	rating: Optional[int] = None
+	comment: Optional[str] = None
 
 # agent event log of workflow
 class AgentEvent(BaseModel):
@@ -133,7 +135,8 @@ class FeedbackRequest(BaseModel):
 	conversation_id: str
 	message_id: str
 	trace_id: str
-	score: float
+	score: Optional[float] = None
+	rating: Optional[int] = None
 	comment: Optional[str] = None
 
 
@@ -639,8 +642,14 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
 @app.post("/api/feedback")
 async def feedback_endpoint(req: FeedbackRequest):
 	"""Collect user feedback from the UI and optionally forward to Langfuse."""
-	if req.score < 0 or req.score > 1:
+	if req.score is None and req.rating is None and not (req.comment and req.comment.strip()):
+		raise HTTPException(status_code=400, detail="Feedback must include a score, rating, or comment")
+	if req.score is not None and (req.score < 0 or req.score > 1):
 		raise HTTPException(status_code=400, detail="Score must be between 0 and 1")
+	if req.rating is not None and req.rating not in range(1, 6):
+		raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
+
+	comment = req.comment.strip() if req.comment else None
 
 	state = conversation_store.get(req.conversation_id)
 	if state is None:
@@ -650,20 +659,59 @@ async def feedback_endpoint(req: FeedbackRequest):
 		"message_id": req.message_id,
 		"trace_id": req.trace_id,
 		"score": req.score,
-		"comment": req.comment,
+		"rating": req.rating,
+		"comment": comment,
 		"timestamp": time.time() * 1000,
 	}
 	state.setdefault("feedback", []).append(entry)
 	conversation_store.save(req.conversation_id, state)
 
-	sent_to_langfuse = telemetry.submit_feedback(
-		trace_id=req.trace_id,
-		score=req.score,
-		comment=req.comment,
-		metadata={"conversation_id": req.conversation_id, "message_id": req.message_id},
-	)
+	sent_results = []
+	if req.score is not None:
+		sent_results.append(
+			telemetry.submit_feedback(
+				trace_id=req.trace_id,
+				score=req.score,
+				comment=comment,
+				metadata={
+					"conversation_id": req.conversation_id,
+					"message_id": req.message_id,
+					"feedback_type": "binary",
+				},
+				score_name="user-feedback",
+			)
+		)
+	if req.rating is not None:
+		sent_results.append(
+			telemetry.submit_feedback(
+				trace_id=req.trace_id,
+				score=float(req.rating),
+				comment=comment,
+				metadata={
+					"conversation_id": req.conversation_id,
+					"message_id": req.message_id,
+					"feedback_type": "rating",
+					"rating": req.rating,
+				},
+				score_name="user-rating",
+			)
+		)
+	if req.score is None and req.rating is None and comment:
+		sent_results.append(
+			telemetry.submit_feedback(
+				trace_id=req.trace_id,
+				score=None,
+				comment=comment,
+				metadata={
+					"conversation_id": req.conversation_id,
+					"message_id": req.message_id,
+					"feedback_type": "comment",
+				},
+				score_name="user-comment",
+			)
+		)
 
-	return {"status": "ok", "sent_to_langfuse": sent_to_langfuse}
+	return {"status": "ok", "sent_to_langfuse": any(sent_results)}
 
 
 @app.get("/api/seatmap", response_model=SeatMapResponse)

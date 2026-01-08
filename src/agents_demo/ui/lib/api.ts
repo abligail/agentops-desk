@@ -18,7 +18,8 @@ export async function sendFeedback(payload: {
   conversation_id: string;
   message_id: string;
   trace_id: string;
-  score: number;
+  score?: number;
+  rating?: number;
   comment?: string;
 }) {
   try {

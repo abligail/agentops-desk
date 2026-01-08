@@ -40,7 +40,7 @@ export default function Home() {
         );
       }
       if (Array.isArray(data.messages)) {
-        setMessages(
+          setMessages(
           data.messages.map((m: any) => ({
             id: m.id ?? Date.now().toString() + Math.random().toString(),
             content: m.content,
@@ -48,7 +48,14 @@ export default function Home() {
             agent: m.agent,
             traceId: m.trace_id,
             timestamp: new Date(m.timestamp ?? Date.now()),
-            feedback: m.feedback ?? null,
+            feedback:
+              m.feedback === 1
+                ? "positive"
+                : m.feedback === 0
+                ? "negative"
+                : m.feedback ?? null,
+            rating: m.rating ?? null,
+            feedbackComment: m.comment ?? null,
           }))
         );
       }
@@ -102,7 +109,14 @@ export default function Home() {
         agent: m.agent,
         traceId: m.trace_id ?? data.trace_id,
         timestamp: new Date(m.timestamp ?? Date.now()),
-        feedback: m.feedback ?? null,
+        feedback:
+          m.feedback === 1
+            ? "positive"
+            : m.feedback === 0
+            ? "negative"
+            : m.feedback ?? null,
+        rating: m.rating ?? null,
+        feedbackComment: m.comment ?? null,
       }));
       setMessages((prev) => [...prev, ...responses]);
     }
@@ -131,6 +145,35 @@ export default function Home() {
     );
   };
 
+  const handleRatingSubmit = async (
+    messageId: string,
+    traceId: string | undefined,
+    rating?: number,
+    comment?: string
+  ) => {
+    if (!conversationId || !traceId) return;
+    const trimmedComment = comment?.trim();
+    if (rating == null && !trimmedComment) return;
+    await sendFeedback({
+      conversation_id: conversationId,
+      message_id: messageId,
+      trace_id: traceId,
+      rating,
+      comment: trimmedComment,
+    });
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              rating: rating ?? m.rating ?? null,
+              feedbackComment: trimmedComment ?? m.feedbackComment ?? null,
+            }
+          : m
+      )
+    );
+  };
+
   return (
     <main className="flex h-screen gap-2 bg-gray-100 p-2">
       <AgentPanel
@@ -146,6 +189,7 @@ export default function Home() {
         isLoading={isLoading}
         conversationId={conversationId ?? undefined}
         onFeedback={handleFeedback}
+        onRatingSubmit={handleRatingSubmit}
       />
     </main>
   );

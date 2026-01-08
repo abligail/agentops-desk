@@ -16,6 +16,12 @@ interface ChatProps {
     traceId: string | undefined,
     positive: boolean
   ) => void;
+  onRatingSubmit?: (
+    messageId: string,
+    traceId: string | undefined,
+    rating?: number,
+    comment?: string
+  ) => void;
 }
 
 export function Chat({
@@ -23,6 +29,7 @@ export function Chat({
   onSendMessage,
   isLoading,
   onFeedback,
+  onRatingSubmit,
   conversationId,
 }: ChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -31,6 +38,8 @@ export function Chat({
   const [showSeatMap, setShowSeatMap] = useState(false);
   const [selectedSeat, setSelectedSeat] = useState<string | undefined>(undefined);
   const [seenSeatMapTriggers, setSeenSeatMapTriggers] = useState(0);
+  const [draftRatings, setDraftRatings] = useState<Record<string, number>>({});
+  const [draftComments, setDraftComments] = useState<Record<string, string>>({});
 
   // Auto-scroll to bottom when messages or loading indicator change
   useEffect(() => {
@@ -75,6 +84,38 @@ export function Chat({
     [handleSend, isComposing]
   );
 
+  const handleRatingSelect = useCallback((messageId: string, rating: number) => {
+    setDraftRatings((prev) => ({ ...prev, [messageId]: rating }));
+  }, []);
+
+  const handleCommentChange = useCallback((messageId: string, value: string) => {
+    setDraftComments((prev) => ({ ...prev, [messageId]: value }));
+  }, []);
+
+  const handleRatingSubmit = useCallback(
+    (messageId: string, traceId: string | undefined) => {
+      if (!onRatingSubmit || !traceId) return;
+      const rating = draftRatings[messageId];
+      const comment = (draftComments[messageId] ?? "").trim();
+      if (!rating && !comment) return;
+      const payloadComment = comment || undefined;
+      onRatingSubmit(messageId, traceId, rating, payloadComment);
+      setDraftComments((prev) => {
+        const next = { ...prev };
+        delete next[messageId];
+        return next;
+      });
+      if (rating) {
+        setDraftRatings((prev) => {
+          const next = { ...prev };
+          delete next[messageId];
+          return next;
+        });
+      }
+    },
+    [draftComments, draftRatings, onRatingSubmit]
+  );
+
   return (
     <div className="flex flex-col h-full flex-1 bg-white shadow-sm border border-gray-200 border-t-0 rounded-xl">
       <div className="bg-blue-600 text-white h-12 px-4 flex items-center rounded-t-xl">
@@ -86,6 +127,12 @@ export function Chat({
       <div className="flex-1 overflow-y-auto min-h-0 md:px-4 pt-4 pb-20">
         {messages.map((msg, idx) => {
           if (msg.content === "DISPLAY_SEAT_MAP") return null; // Skip rendering marker message
+          const ratingLocked = msg.rating != null;
+          const commentLocked =
+            !!msg.feedbackComment && msg.feedbackComment.trim().length > 0;
+          const feedbackLocked = ratingLocked || commentLocked;
+          const hasDraftRating = !!draftRatings[msg.id];
+          const draftComment = (draftComments[msg.id] ?? "").trim();
           return (
             <div
               key={msg.id ?? idx}
@@ -130,6 +177,66 @@ export function Chat({
                       {!msg.traceId && (
                         <span className="text-[11px] text-gray-400">no trace id</span>
                       )}
+                    </div>
+                  )}
+                  {msg.role === "assistant" && onRatingSubmit && (
+                    <div className="mt-2 text-xs text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px]">Rating:</span>
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map((value) => {
+                            const ratingValue = ratingLocked
+                              ? msg.rating ?? 0
+                              : draftRatings[msg.id] ?? msg.rating ?? 0;
+                            const isActive = ratingValue >= value;
+                            return (
+                              <button
+                                key={value}
+                                type="button"
+                                className={`text-base leading-none transition ${
+                                  isActive ? "text-amber-500" : "text-gray-300"
+                                } ${
+                                  feedbackLocked
+                                    ? "cursor-default"
+                                    : "hover:text-amber-500"
+                                }`}
+                                disabled={!msg.traceId || feedbackLocked}
+                                onClick={() => handleRatingSelect(msg.id, value)}
+                              >
+                                {isActive ? "★" : "☆"}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {feedbackLocked && (
+                          <span className="text-[11px] text-gray-400">submitted</span>
+                        )}
+                        {!msg.traceId && (
+                          <span className="text-[11px] text-gray-400">no trace id</span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex items-start gap-2">
+                        <textarea
+                          rows={2}
+                          placeholder="文字反馈（可选）"
+                          className="w-full resize-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          value={draftComments[msg.id] ?? msg.feedbackComment ?? ""}
+                          onChange={(e) => handleCommentChange(msg.id, e.target.value)}
+                          disabled={!msg.traceId || feedbackLocked}
+                        />
+                        <button
+                          type="button"
+                          className="rounded-md bg-blue-600 px-3 py-1 text-[11px] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
+                          disabled={
+                            !msg.traceId ||
+                            feedbackLocked ||
+                            (!hasDraftRating && !draftComment)
+                          }
+                          onClick={() => handleRatingSubmit(msg.id, msg.traceId)}
+                        >
+                          提交
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

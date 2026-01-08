@@ -65,6 +65,7 @@ Provide:
 - Optional improvement suggestions
 
 Be objective and constructive in your evaluation.
+Respond with a json object matching the EvaluationScore schema.
 """,
     output_type=EvaluationScore,
 )

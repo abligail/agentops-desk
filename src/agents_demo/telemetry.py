@@ -73,27 +73,29 @@ class Telemetry:
         self,
         *,
         trace_id: str,
-        score: float,
+        score: Optional[float],
         comment: Optional[str],
         metadata: Optional[Dict[str, Any]] = None,
+        score_name: str = "user-feedback",
     ) -> bool:
         """Submit user feedback to Langfuse if available and log locally."""
         feedback_payload = {
             "trace_id": trace_id,
             "score": score,
+            "score_name": score_name,
             "comment": comment,
             "metadata": metadata or {},
             "ts": time.time(),
         }
         _append_jsonl(self.feedback_log, feedback_payload)
 
-        if not self._langfuse:
+        if score is None or not self._langfuse:
             return False
 
         try:
             # Align with langfuse scoring API used in the Gradio example
             self._langfuse.create_score(
-                name="user-feedback",
+                name=score_name,
                 value=score,
                 trace_id=trace_id,
                 data_type="NUMERIC",
@@ -104,4 +106,3 @@ class Telemetry:
         except Exception as exc:  # pragma: no cover - network/env dependent
             logger.info("Failed to forward feedback to Langfuse: %s", exc)
             return False
-

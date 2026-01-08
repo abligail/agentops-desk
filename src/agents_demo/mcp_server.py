@@ -156,7 +156,14 @@ class AgentFunctionWrapper:
             return
 
         for tool in self.agent.tools:
-            tool_name = getattr(tool, "name", tool.__name__)
+            # Handle both FunctionTool objects and raw functions
+            if hasattr(tool, "name"):
+                tool_name = tool.name
+            elif hasattr(tool, "__name__"):
+                tool_name = tool.__name__
+            else:
+                tool_name = str(tool)
+
             self._wrapped_tools[tool_name] = track_function_call(self.tracker)(tool)
 
     def get_wrapped_agent(self) -> Agent:
@@ -168,7 +175,14 @@ class AgentFunctionWrapper:
             self.agent.tools.clear()
 
             for tool in tool_list:
-                tool_name = getattr(tool, "name", tool.__name__)
+                # Handle both FunctionTool objects and raw functions
+                if hasattr(tool, "name"):
+                    tool_name = tool.name
+                elif hasattr(tool, "__name__"):
+                    tool_name = tool.__name__
+                else:
+                    tool_name = str(tool)
+
                 if tool_name in self._wrapped_tools:
                     self.agent.tools.append(self._wrapped_tools[tool_name])
 

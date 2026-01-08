@@ -15,11 +15,13 @@ dependencies = [
     { name = "fastapi" },
     { name = "gradio" },
     { name = "langfuse" },
+    { name = "mcp" },
     { name = "nest-asyncio" },
     { name = "openai-agents" },
     { name = "openinference-instrumentation-openai-agents" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
+    { name = "python-dotenv" },
     { name = "uvicorn" },
 ]
 
@@ -29,11 +31,13 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.124.4" },
     { name = "gradio", specifier = ">=6.1.0" },
     { name = "langfuse", specifier = ">=3.10.6" },
+    { name = "mcp", specifier = ">=1.0.0" },
     { name = "nest-asyncio", specifier = ">=1.6.0" },
     { name = "openai-agents", specifier = ">=0.6.3" },
     { name = "openinference-instrumentation-openai-agents", specifier = ">=1.4.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0" },
     { name = "pydantic", specifier = ">=2.12.4" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "uvicorn", specifier = ">=0.38.0" },
 ]
 

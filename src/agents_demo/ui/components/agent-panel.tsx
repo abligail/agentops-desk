@@ -18,10 +18,6 @@ interface AgentPanelProps {
     seat_number?: string;
     flight_number?: string;
     account_number?: string;
-    meal_preference?: string;
-    dietary_restrictions?: string;
-    special_requests?: string;
-    meal_status?: string;
   };
 }
 
@@ -36,18 +32,16 @@ export function AgentPanel({
   const runnerEvents = events.filter((e) => e.type !== "message");
 
   return (
-    <div className="w-full lg:w-[56%] h-full flex flex-col rounded-2xl border border-white/10 bg-white/90 shadow-xl backdrop-blur">
-      <div className="from-emerald-500/90 to-blue-600/90 bg-gradient-to-r text-white h-12 px-4 flex items-center gap-3 shadow-md rounded-t-2xl">
+    <div className="w-3/5 h-full flex flex-col border-r border-gray-200 bg-white rounded-xl shadow-sm">
+      <div className="bg-blue-600 text-white h-12 px-4 flex items-center gap-3 shadow-sm rounded-t-xl">
         <Bot className="h-5 w-5" />
-        <h1 className="font-semibold text-sm sm:text-base lg:text-lg">
-          Agent View
-        </h1>
+        <h1 className="font-semibold text-sm sm:text-base lg:text-lg">Agent View</h1>
         <span className="ml-auto text-xs font-light tracking-wide opacity-80">
           Airline&nbsp;Co.
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-white/80 to-white/60">
+      <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
         <AgentsList agents={agents} currentAgent={currentAgent} />
         <Guardrails
           guardrails={guardrails}

@@ -7,7 +7,7 @@ authors = [
     { name = "acture", email = "acturea@gmail.com" }
 ]
 requires-python = ">=3.12"
- dependencies = [
+dependencies = [
     "dotenv>=0.9.9",
     "fastapi>=0.124.4",
     "gradio>=6.1.0",
@@ -30,6 +30,8 @@ demo_serve_fastapi= "agents_demo.agents.serve:serve_fastapi"
 demo_serve_gradio = "agents_demo.agents.serve:serve_gradio"
 demo_serve_both = "agents_demo.agents.serve:serve_both"
 demo_mcp_eval = "agents_demo.mcp.mcp_demo:main"
+food_mcp_create_dataset = "agents_demo.mcp_eval_food.dataset:create_dataset"
+food_mcp_run_test = "agents_demo.mcp_eval_food.dataset:run_test"
 
 
 [build-system]

@@ -177,13 +177,14 @@ async def evaluate_response(
         # Run evaluator agent
         if OpenAIModel:
             result = await Runner.run(evaluator_agent, eval_prompt)
-            score = result.final_output_as(EvaluationScore)
         else:
             result = await Runner.run(
                 evaluator_agent, eval_prompt, run_config=myRunConfig
             )
-
-        score = result.final_output_as(EvaluationScore)
+        if OpenAIModel:
+            score = result.final_output_as(EvaluationScore)
+        else:
+            score = _coerce_evaluation_output(getattr(result, "final_output", None))
         logger.info(f"Evaluated response: overall={score.overall_score:.2f}")
 
         # If Langfuse client is provided, submit scores immediately

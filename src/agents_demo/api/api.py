@@ -27,6 +27,8 @@ from agents_demo.agents.main_qwen import (
     create_initial_context,
     AirlineAgentContext,
     food_service_agent,
+    USE_FOOD_MCP,
+    FOOD_MCP_SERVER,
 )
 from agents_demo.agents.main_qwen import (
     OpenAIModel as bOpenAIModel,
@@ -204,24 +206,28 @@ class ChatResponse(BaseModel):
 # Persistent conversation store instance
 # ===================================================================================
 data_dir = Path(__file__).resolve().parent.parent / "data"
-conversation_store = JsonConversationStore(
+primary_store = None
+try:
+    primary_store = PostgresConversationStore(
+        context_loader=lambda payload: AirlineAgentContext(**payload),
+        seed_path=data_dir / "conversations.json",
+    )
+except Exception as exc:
+    logger.warning("Postgres store unavailable, using JSON store only: %s", exc)
+
+json_store = JsonConversationStore(
     data_dir / "conversations.json",
     context_loader=lambda payload: AirlineAgentContext(**payload),
 )
 
-"""
-conversation_store = CompositeConversationStore(
-    PostgresConversationStore(
-        context_loader=lambda payload: AirlineAgentContext(**payload),
-        seed_path=data_dir / "conversations.json",
-    ),
-    JsonConversationStore(
-        data_dir / "conversations.json",
-        context_loader=lambda payload: AirlineAgentContext(**payload),
-    ),
-    sync_secondary_from_primary=True,
-)
-"""
+if primary_store is None:
+    conversation_store = json_store
+else:
+    conversation_store = CompositeConversationStore(
+        primary_store,
+        json_store,
+        sync_secondary_from_primary=True,
+    )
 
 # ===================================================================================
 # Telemetry for trace logging and feedback forwarding
@@ -230,6 +236,17 @@ telemetry = Telemetry(
     trace_log=data_dir / "traces.jsonl",
     feedback_log=data_dir / "feedback.jsonl",
 )
+
+
+@app.on_event("startup")
+async def _connect_food_mcp() -> None:
+    """Ensure the Food MCP server is connected before handling requests."""
+    if USE_FOOD_MCP and FOOD_MCP_SERVER is not None:
+        try:
+            await FOOD_MCP_SERVER.connect()
+            logger.info("Food MCP server connected")
+        except Exception as exc:
+            logger.warning("Failed to connect Food MCP server: %s", exc)
 
 # =========================
 # Helpers

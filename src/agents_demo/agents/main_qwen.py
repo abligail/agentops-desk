@@ -637,7 +637,30 @@ class RelevanceOutput(BaseModel):
     is_relevant: bool
 
 
-_guardrail_output_type = RelevanceOutput
+_guardrail_output_type = RelevanceOutput if OpenAIModel else None
+
+
+def _coerce_guardrail_output(raw, model_cls, default):
+    if isinstance(raw, model_cls):
+        return raw
+    if isinstance(raw, dict):
+        try:
+            return model_cls.model_validate(raw)
+        except Exception:
+            pass
+    if isinstance(raw, str):
+        try:
+            return model_cls.model_validate_json(raw)
+        except Exception:
+            pass
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                return model_cls.model_validate_json(raw[start : end + 1])
+            except Exception:
+                pass
+    return default
 
 
 guardrail_agent = Agent(
@@ -671,14 +694,22 @@ async def relevance_guardrail(
 ) -> GuardrailFunctionOutput:
     """Guardrail to check if input is relevant to airline topics."""
 
-    if OpenAIModel:
-        result = await Runner.run(guardrail_agent, input, context=context.context)
-        final = result.final_output_as(RelevanceOutput)
-    else:
-        result = await Runner.run(
-            guardrail_agent, input, context=context.context, run_config=myRunConfig
-        )
-        final = result.final_output_as(RelevanceOutput)
+    default = RelevanceOutput(reasoning="fallback", is_relevant=True)
+    try:
+        if OpenAIModel:
+            result = await Runner.run(guardrail_agent, input, context=context.context)
+        else:
+            result = await Runner.run(
+                guardrail_agent, input, context=context.context, run_config=myRunConfig
+            )
+        if _guardrail_output_type is not None:
+            final = result.final_output_as(RelevanceOutput)
+        else:
+            final = _coerce_guardrail_output(
+                getattr(result, "final_output", None), RelevanceOutput, default
+            )
+    except Exception:
+        final = default
 
     # result = await Runner.run(guardrail_agent, input, context=context.context)
     # final = result.final_output_as(RelevanceOutput)
@@ -694,7 +725,7 @@ class JailbreakOutput(BaseModel):
     is_safe: bool
 
 
-_jailbreak_output_type = JailbreakOutput
+_jailbreak_output_type = JailbreakOutput if OpenAIModel else None
 
 
 jailbreak_guardrail_agent = Agent(
@@ -724,19 +755,27 @@ async def jailbreak_guardrail(
 ) -> GuardrailFunctionOutput:
     """Guardrail to detect jailbreak attempts."""
 
-    if OpenAIModel:
-        result = await Runner.run(
-            jailbreak_guardrail_agent, input, context=context.context
-        )
-        final = result.final_output_as(JailbreakOutput)
-    else:
-        result = await Runner.run(
-            jailbreak_guardrail_agent,
-            input,
-            context=context.context,
-            run_config=myRunConfig,
-        )
-        final = result.final_output_as(JailbreakOutput)
+    default = JailbreakOutput(reasoning="fallback", is_safe=True)
+    try:
+        if OpenAIModel:
+            result = await Runner.run(
+                jailbreak_guardrail_agent, input, context=context.context
+            )
+        else:
+            result = await Runner.run(
+                jailbreak_guardrail_agent,
+                input,
+                context=context.context,
+                run_config=myRunConfig,
+            )
+        if _jailbreak_output_type is not None:
+            final = result.final_output_as(JailbreakOutput)
+        else:
+            final = _coerce_guardrail_output(
+                getattr(result, "final_output", None), JailbreakOutput, default
+            )
+    except Exception:
+        final = default
 
     # result = await Runner.run(jailbreak_guardrail_agent, input, context=context.context)
     # final = result.final_output_as(JailbreakOutput)

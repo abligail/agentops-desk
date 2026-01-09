@@ -40,6 +40,8 @@ https://bailian.console.aliyun.com/?tab=model#/model-market/detail/qwen3-next-80
 #======================================================
 OpenAIModel = os.getenv("USE_OPENAI_MODEL", "true").lower() == "true"
 OutputSteaming = os.getenv("OUTPUT_STREAMING", "false").lower() == "true"
+USE_FOOD_MCP = os.getenv("USE_FOOD_MCP", "true").lower() == "true"
+FOOD_MCP_URL = os.getenv("FOOD_MCP_URL", "http://127.0.0.1:8007/mcp")
 
 if OpenAIModel:
     BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
@@ -103,6 +105,7 @@ from agents import (
     GuardrailFunctionOutput,
     input_guardrail,
 )
+from agents.mcp import MCPServerStreamableHttp
 #special prompt prefix for handoff agents
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 
@@ -913,25 +916,52 @@ def food_service_instructions(
 	confirmation = ctx.confirmation_number or "[unknown]"
 	seat = ctx.seat_number or "[unknown]"
 	meal = ctx.meal_preference or "not captured"
+	account = ctx.account_number or "[unknown]"
+	flight = ctx.flight_number or "[unknown]"
+	conversation = ctx.conversation_id or "[unknown]"
 	return (
 		f"{RECOMMENDED_PROMPT_PREFIX}\n"
 		"You are the Food Service Agent. Assist passengers with inflight meal preferences and dietary needs.\n"
-		f"1. Current confirmation: {confirmation}, seat: {seat}. If missing, use fetch_customer_profile when possible or politely collect them.\n"
+		f"1. Current confirmation: {confirmation}, seat: {seat}, flight: {flight}, account: {account}.\n"
+		f"   Conversation id: {conversation}. If any required details are missing, use fetch_customer_profile or ask the customer.\n"
 		f"2. Existing meal note: {meal}. Ask about allergies or dietary restrictions before suggesting options.\n"
 		"3. Offer relevant options using the check_menu_options tool. Use record_meal_preference to capture choices, "
 		"then confirm_meal_selection once the customer agrees.\n"
+		"   When calling MCP tools, pass conversation_id/account_number/confirmation_number/flight_number/seat_number if known.\n"
 		"4. If the request is unrelated to meals/food, hand off to the triage agent."
 	)
 
-food_service_agent = Agent[AirlineAgentContext](
-	name="Food Service Agent",
-	#model="gpt-4.1",
-	model=qwen_model1,
-	handoff_description="Handles onboard meal preferences and dietary requests.",
-	instructions=food_service_instructions,
-	tools=[fetch_customer_profile, check_menu_options, record_meal_preference, confirm_meal_selection],
-	input_guardrails=[relevance_guardrail, jailbreak_guardrail],
-)
+def _build_food_mcp_server() -> MCPServerStreamableHttp:
+	return MCPServerStreamableHttp(
+		name="food-service-mcp",
+		params={"url": FOOD_MCP_URL, "timeout": 30},
+		cache_tools_list=True,
+		max_retry_attempts=1,
+		client_session_timeout_seconds=30,
+	)
+
+if USE_FOOD_MCP:
+	FOOD_MCP_SERVER = _build_food_mcp_server()
+	food_service_agent = Agent[AirlineAgentContext](
+		name="Food Service Agent",
+		#model="gpt-4.1",
+		model=qwen_model1,
+		handoff_description="Handles onboard meal preferences and dietary requests.",
+		instructions=food_service_instructions,
+		mcp_servers=[FOOD_MCP_SERVER],
+		input_guardrails=[relevance_guardrail, jailbreak_guardrail],
+	)
+else:
+	FOOD_MCP_SERVER = None
+	food_service_agent = Agent[AirlineAgentContext](
+		name="Food Service Agent",
+		#model="gpt-4.1",
+		model=qwen_model1,
+		handoff_description="Handles onboard meal preferences and dietary requests.",
+		instructions=food_service_instructions,
+		tools=[fetch_customer_profile, check_menu_options, record_meal_preference, confirm_meal_selection],
+		input_guardrails=[relevance_guardrail, jailbreak_guardrail],
+	)
 
 faq_agent = Agent[AirlineAgentContext](
     name="FAQ Agent",

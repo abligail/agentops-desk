@@ -129,6 +129,7 @@ dmypy.json
 
 # Node / frontend
 node_modules/
+openai-agentmcp-evaluation/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

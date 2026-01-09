@@ -28,6 +28,8 @@ from .main_qwen import (
 	create_initial_context,
 	AirlineAgentContext,
 	food_service_agent,
+	USE_FOOD_MCP,
+	FOOD_MCP_SERVER,
 )
 from .main_qwen import OpenAIModel as bOpenAIModel  # True: use OpenAI model; False: use Qwen model
 from .main_qwen import myRunConfig
@@ -218,6 +220,17 @@ telemetry = Telemetry(
 	trace_log=data_dir / "traces.jsonl",
 	feedback_log=data_dir / "feedback.jsonl",
 )
+
+
+@app.on_event("startup")
+async def _connect_food_mcp() -> None:
+	"""Ensure the Food MCP server is connected before handling requests."""
+	if USE_FOOD_MCP and FOOD_MCP_SERVER is not None:
+		try:
+			await FOOD_MCP_SERVER.connect()
+			logger.info("Food MCP server connected")
+		except Exception as exc:
+			logger.warning("Failed to connect Food MCP server: %s", exc)
 
 # =========================
 # Helpers

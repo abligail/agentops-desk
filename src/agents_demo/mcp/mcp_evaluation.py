@@ -6,19 +6,18 @@ Creates MCP servers from agents for tool call observation and evaluation
 from __future__ import annotations
 
 import logging
+import asyncio
+import time
+import json
 from typing import Any, Optional, Dict, List
 
-try:
-    from mcp.server import Server
-    from mcp.server.stdio import stdio_server
-    from mcp.types import Tool, TextContent
+# Standard MCP imports
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+from mcp.types import Tool, TextContent
 
-    MCP_AVAILABLE = True
-except ImportError:
-    MCP_AVAILABLE = False
-    logging.warning(
-        "MCP package not available. MCP server functionality will be limited."
-    )
+from agents.tool import FunctionTool
+from agents.tool_context import ToolContext
 
 from .mcp_server import (
     FunctionCallTracker,
@@ -38,12 +37,7 @@ class MCPEvaluationServer:
         tracker: Optional[FunctionCallTracker] = None,
         langfuse_client=None,
     ):
-        if not MCP_AVAILABLE:
-            logger.warning("MCP package not available, creating mock server")
-            self.server = None
-        else:
-            self.server = Server(f"{agent_name}_mcp_evaluation")
-
+        self.server = Server(f"{agent_name}_mcp_evaluation")
         self.agent_name = agent_name
         self.tracker = tracker or FunctionCallTracker()
         self.langfuse = langfuse_client
@@ -69,18 +63,72 @@ class MCPEvaluationServer:
             logger.error(error_msg)
             return error_msg
 
-        import time
+        logger.info(f"Processing tool call: {tool_name} with trace_id={trace_id}")
+
+        if trace_id:
+            self.tracker.start_trace(trace_id, self.agent_name)
 
         start_time = time.time()
 
         try:
-            tool_func = self.tools_mapping[tool_name]["function"]
-            result = await tool_func(**arguments)
+            tool_obj = self.tools_mapping[tool_name]["function"]
+            args = arguments or {}
+
+            # Handle FunctionTool instances (which require ToolContext and JSON string input)
+            if isinstance(tool_obj, FunctionTool):
+                # Import context classes dynamically to avoid circular imports
+                try:
+                    from agents_demo.agents.main import create_initial_context
+                except ImportError:
+                    logger.warning(
+                        "Could not import agents context classes, using placeholders"
+                    )
+                    create_initial_context = lambda: None  # type: ignore
+
+                # Create a valid context for the tools
+                # Real agents use AirlineAgentContext, so we create a mock one here
+                # to prevent tools from crashing when accessing context properties
+                agent_context = create_initial_context()
+
+                # Mock the RunContextWrapper structure that tools expect
+                # Tools often access context.context.some_field, so we need a structure
+                # that has a 'context' attribute which holds the actual data
+                class MockRunContextWrapper:
+                    def __init__(self, context_data):
+                        self.context = context_data
+
+                mock_context_wrapper = MockRunContextWrapper(agent_context)
+
+                # FunctionTool expects input as a JSON string
+                # We need to ensure args are serializable
+                try:
+                    input_str = json.dumps(args)
+                except Exception:
+                    input_str = str(args)
+
+                # Create the ToolContext with our mock wrapper
+                # We do not pass llm/agent as they are not part of the constructor
+                # We need to provide tool_name, tool_call_id and tool_arguments as required by ToolContext
+                ctx = ToolContext(
+                    context=mock_context_wrapper,
+                    tool_name=tool_name,
+                    tool_call_id=f"call_{trace_id or 'unknown'}",
+                    tool_arguments=input_str,
+                )
+
+                # Invoke the tool
+                # on_invoke_tool signature: (ctx: ToolContext[Context], input: str) -> str
+                result = await tool_obj.on_invoke_tool(ctx, input_str)
+
+            else:
+                # Assume standard callable (function/method)
+                result = await tool_obj(**args)
+
             execution_time = time.time() - start_time
 
             self.tracker.log_function_call(
                 function_name=tool_name,
-                arguments=arguments,
+                arguments=args,
                 result=str(result),
                 success=True,
                 execution_time=execution_time,
@@ -95,13 +143,16 @@ class MCPEvaluationServer:
             execution_time = time.time() - start_time
             self.tracker.log_function_call(
                 function_name=tool_name,
-                arguments=arguments,
+                arguments=arguments or {},
                 result=str(e),
                 success=False,
                 execution_time=execution_time,
             )
             logger.error(f"Tool {tool_name} failed: {e}")
             return f"Error: {str(e)}"
+        finally:
+            if trace_id:
+                self.tracker.end_trace()
 
     def setup_mcp_handlers(self):
         """Setup MCP server handlers"""
@@ -117,6 +168,10 @@ class MCPEvaluationServer:
                     Tool(
                         name=tool_name,
                         description=tool_info["description"],
+                        inputSchema={
+                            "type": "object",
+                            "properties": {},  # Simplified schema for now
+                        },
                     )
                 )
             return tools
@@ -126,15 +181,14 @@ class MCPEvaluationServer:
             name: str, arguments: Dict[str, Any]
         ) -> List[TextContent]:
             """Handle tool calls"""
-            result = await self.call_tool_with_tracking(name, arguments)
+            trace_id = f"mcp_trace_{int(time.time() * 1000)}"
+            result = await self.call_tool_with_tracking(
+                name, arguments, trace_id=trace_id
+            )
             return [TextContent(type="text", text=result)]
 
     async def run_server(self):
         """Run the MCP server"""
-        if not self.server:
-            logger.warning("MCP server not available, running in mock mode")
-            return
-
         self.setup_mcp_handlers()
 
         async with stdio_server() as (read_stream, write_stream):
@@ -177,6 +231,16 @@ class AgentMCPEvaluator:
         self.mcp_servers[agent_name] = mcp_server
         return mcp_server
 
+    def wrap_agent(self, agent: Any) -> Any:
+        """
+        Wrap an agent to track its function calls using this evaluator's tracker.
+        Modifies the agent's tools in-place.
+        """
+        wrapper = AgentFunctionWrapper(
+            agent, tracker=self.tracker, langfuse_client=self.langfuse
+        )
+        return wrapper.get_wrapped_agent()
+
     async def evaluate_agent_trace(
         self,
         trace_id: str,
@@ -194,7 +258,9 @@ class AgentMCPEvaluator:
                 "agent_name": agent_name,
                 "total_calls": 0,
                 "success_rate": 0.0,
+                "average_execution_time": 0.0,
                 "evaluation": "No function calls found",
+                "function_usage": {},
             }
 
         total_calls = len(calls)
@@ -247,27 +313,44 @@ class AgentMCPEvaluator:
         evaluation: Dict[str, Any],
     ):
         """Submit evaluation results to Langfuse"""
+        # Type check to satisfy linter
+        client = self.langfuse
+        if not client:
+            return
+
         try:
-            self.langfuse.create_score(
+            # Helper to safely create scores
+            if hasattr(client, "score"):
+                score_func = getattr(client, "score")
+            elif hasattr(client, "create_score"):
+                score_func = getattr(client, "create_score")
+            else:
+                logger.warning("Langfuse client has no score/create_score method")
+                return
+
+            def safe_create_score(**kwargs):
+                score_func(**kwargs)
+
+            safe_create_score(
                 trace_id=trace_id,
                 name="mcp_function_call_success_rate",
-                value=evaluation["success_rate"],
+                value=float(evaluation["success_rate"]),
                 data_type="NUMERIC",
                 comment=f"Function call success rate for agent {evaluation['agent_name']}",
             )
 
-            self.langfuse.create_score(
+            safe_create_score(
                 trace_id=trace_id,
                 name="mcp_total_function_calls",
-                value=evaluation["total_calls"],
+                value=float(evaluation["total_calls"]),
                 data_type="NUMERIC",
                 comment=f"Total function calls for agent {evaluation['agent_name']}",
             )
 
-            self.langfuse.create_score(
+            safe_create_score(
                 trace_id=trace_id,
                 name="mcp_avg_execution_time",
-                value=evaluation["average_execution_time"],
+                value=float(evaluation["average_execution_time"]),
                 data_type="NUMERIC",
                 comment=f"Average function call execution time for agent {evaluation['agent_name']}",
             )
@@ -321,12 +404,16 @@ async def run_mcp_evaluation_example():
     """
     Example demonstrating how to use MCP evaluation with agents
     """
-    from .main_qwen import qwen_model2, myRunConfig, OpenAIModel
-    from .main import (
-        seat_booking_agent,
-        flight_status_agent,
-        faq_agent,
-    )
+    try:
+        from agents_demo.agents.main import (
+            seat_booking_agent,
+            flight_status_agent,
+            faq_agent,
+            AirlineAgentContext,
+        )
+    except ImportError:
+        logger.error("Could not import agents for example")
+        return
 
     logger.info("Starting MCP Evaluation Example")
 
@@ -337,11 +424,31 @@ async def run_mcp_evaluation_example():
             evaluator.create_mcp_server_for_agent(agent.name, agent.tools)
             logger.info(f"Created MCP server for agent: {agent.name}")
 
+    # Explicitly simulate a tool call to verify the loop
+    if "Flight Status Agent" in evaluator.mcp_servers:
+        server = evaluator.mcp_servers["Flight Status Agent"]
+
+        tool_name = "flight_status_tool"
+        if tool_name in server.tools_mapping:
+            logger.info(f"Simulating call to {tool_name} for verification...")
+
+            trace_id = "example_run_trace_002"
+
+            # Use valid args for this tool
+            args = {"flight_number": "UA123"}
+
+            await server.call_tool_with_tracking(tool_name, args, trace_id=trace_id)
+
+            # Now evaluate
+            report = await evaluator.evaluate_agent_trace(
+                trace_id, "Flight Status Agent"
+            )
+            logger.info(f"Verification Trace Report: {report}")
+
     logger.info("MCP servers created successfully")
     logger.info(f"Evaluation Report:\n{evaluator.export_evaluation_report()}")
 
 
 if __name__ == "__main__":
-    import asyncio
-
+    logging.basicConfig(level=logging.INFO)
     asyncio.run(run_mcp_evaluation_example())

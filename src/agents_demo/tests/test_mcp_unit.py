@@ -4,13 +4,13 @@ import time
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
-from agents_demo.mcp_server import (
+from agents_demo.mcp.mcp_server import (
     FunctionCallTracker,
     track_function_call,
     AgentFunctionWrapper,
     MultiAgentObserver,
 )
-from agents_demo.mcp_evaluation import (
+from agents_demo.mcp.mcp_evaluation import (
     MCPEvaluationServer,
     AgentMCPEvaluator,
     create_mcp_evaluator,

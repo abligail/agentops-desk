@@ -8,6 +8,18 @@ export interface Message {
   rating?: number | null
   feedbackComment?: string | null
   timestamp: Date
+  evaluation?: {
+    overall_score: number
+    helpfulness: number
+    accuracy: number
+    relevance: number
+    reasoning: string
+  }
+  mcpMetrics?: {
+    totalCalls: number
+    successRate: number
+    avgTime: number
+  }
 }
 
 export interface Agent {

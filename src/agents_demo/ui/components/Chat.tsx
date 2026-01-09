@@ -149,6 +149,53 @@ export function Chat({
                   {msg.agent && (
                     <div className="text-[11px] text-gray-500 mt-1">via {msg.agent}</div>
                   )}
+                  {msg.evaluation && (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <div className="text-xs font-medium text-gray-700 mb-1">AI Evaluation Score:</div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600">
+                        <div className="flex justify-between">
+                          <span>Overall:</span>
+                          <span className="font-semibold">{msg.evaluation.overall_score.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Helpfulness:</span>
+                          <span>{msg.evaluation.helpfulness.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Accuracy:</span>
+                          <span>{msg.evaluation.accuracy.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Relevance:</span>
+                          <span>{msg.evaluation.relevance.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="mt-1 text-[10px] text-gray-500 italic">
+                        {msg.evaluation.reasoning}
+                      </div>
+                    </div>
+                  )}
+                  {msg.mcpMetrics && (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <div className="text-xs font-medium text-gray-700 mb-1">MCP Tool Metrics:</div>
+                      <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-[11px] text-gray-600">
+                        <div className="flex justify-between">
+                          <span>Total Calls:</span>
+                          <span className="font-semibold">{msg.mcpMetrics.totalCalls}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Success Rate:</span>
+                          <span className={`font-semibold ${msg.mcpMetrics.successRate === 1 ? 'text-green-600' : 'text-amber-600'}`}>
+                            {(msg.mcpMetrics.successRate * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Avg Time:</span>
+                          <span>{msg.mcpMetrics.avgTime.toFixed(3)}s</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {msg.role === "assistant" && onFeedback && (
                     <div className="flex items-center gap-2 mt-2 text-xs text-gray-600">
                       <span className="text-[11px]">Feedback:</span>

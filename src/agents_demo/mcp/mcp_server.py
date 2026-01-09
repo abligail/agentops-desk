@@ -5,14 +5,27 @@ Implements tool call tracking for agents using wrapper/decorator pattern
 
 from __future__ import annotations
 
+import json
 import logging
 import time
-from typing import Any, Optional, Dict, List, Callable
+import copy
+import contextvars
+from typing import Any, Optional, Dict, List, Callable, Union, cast
 from functools import wraps
 
 from agents import Agent, RunContextWrapper
+from agents.tool import FunctionTool
+from agents.tool_context import ToolContext
 
 logger = logging.getLogger(__name__)
+
+# Context variables for tracking trace ID and agent name in async execution
+_current_trace_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "current_trace_id", default=None
+)
+_current_agent_name: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "current_agent_name", default=None
+)
 
 
 class FunctionCallTracker:
@@ -20,20 +33,20 @@ class FunctionCallTracker:
 
     def __init__(self):
         self.call_history: List[Dict[str, Any]] = []
-        self.current_trace_id: Optional[str] = None
-        self.current_agent_name: Optional[str] = None
 
     def start_trace(self, trace_id: str, agent_name: str):
         """Start a new trace"""
-        self.current_trace_id = trace_id
-        self.current_agent_name = agent_name
+        _current_trace_id.set(trace_id)
+        _current_agent_name.set(agent_name)
         logger.info(f"Starting trace {trace_id} for agent {agent_name}")
 
     def end_trace(self):
         """End current trace"""
-        logger.info(f"Ending trace {self.current_trace_id}")
-        self.current_trace_id = None
-        self.current_agent_name = None
+        trace_id = _current_trace_id.get()
+        if trace_id:
+            logger.info(f"Ending trace {trace_id}")
+        _current_trace_id.set(None)
+        _current_agent_name.set(None)
 
     def log_function_call(
         self,
@@ -44,9 +57,12 @@ class FunctionCallTracker:
         execution_time: float,
     ):
         """Log a function call"""
+        trace_id = _current_trace_id.get()
+        agent_name = _current_agent_name.get()
+
         call_record = {
-            "trace_id": self.current_trace_id,
-            "agent_name": self.current_agent_name,
+            "trace_id": trace_id,
+            "agent_name": agent_name,
             "function_name": function_name,
             "arguments": arguments,
             "result": result,
@@ -103,13 +119,25 @@ def track_function_call(tracker: FunctionCallTracker):
     """Decorator to track function calls"""
 
     def decorator(func: Callable):
+        # We need to access the underlying function if it's a FunctionTool
+        original_func = func
+
+        # Check if it's a FunctionTool instance
+        is_function_tool = hasattr(func, "name") and hasattr(func, "description")
+
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
             start_time = time.time()
-            function_name = getattr(func, "name", func.__name__)
+            # Use getattr to safely handle objects that might not have __name__
+            function_name = getattr(
+                original_func,
+                "name",
+                getattr(original_func, "__name__", str(original_func)),
+            )
 
             try:
-                result = await func(*args, **kwargs)
+                # If it's a FunctionTool, we call it directly as it's callable
+                result = await original_func(*args, **kwargs)
                 execution_time = time.time() - start_time
                 tracker.log_function_call(
                     function_name=function_name,
@@ -135,6 +163,48 @@ def track_function_call(tracker: FunctionCallTracker):
     return decorator
 
 
+# Helper to identify if an object is a tool
+def is_tool(obj: Any) -> bool:
+    return hasattr(obj, "name") and hasattr(obj, "description")
+
+
+class TrackedTool:
+    """Proxy class to wrap a tool and track its calls"""
+
+    def __init__(self, tool: Any, tracker: FunctionCallTracker):
+        self._tool = tool
+        self._tracker = tracker
+
+    def __getattr__(self, name):
+        return getattr(self._tool, name)
+
+    async def __call__(self, *args, **kwargs):
+        start_time = time.time()
+        function_name = getattr(self._tool, "name", str(self._tool))
+
+        try:
+            result = await self._tool(*args, **kwargs)
+            execution_time = time.time() - start_time
+            self._tracker.log_function_call(
+                function_name=function_name,
+                arguments=kwargs,
+                result=str(result),
+                success=True,
+                execution_time=execution_time,
+            )
+            return result
+        except Exception as e:
+            execution_time = time.time() - start_time
+            self._tracker.log_function_call(
+                function_name=function_name,
+                arguments=kwargs,
+                result=str(e),
+                success=False,
+                execution_time=execution_time,
+            )
+            raise
+
+
 class AgentFunctionWrapper:
     """Wrapper for agents to enable function call tracking"""
 
@@ -157,42 +227,96 @@ class AgentFunctionWrapper:
 
         for tool in self.agent.tools:
             # Handle both FunctionTool objects and raw functions
-            if hasattr(tool, "name"):
-                tool_name = tool.name
-            elif hasattr(tool, "__name__"):
-                tool_name = tool.__name__
-            else:
-                tool_name = str(tool)
+            tool_name = getattr(tool, "name", getattr(tool, "__name__", str(tool)))
 
-            self._wrapped_tools[tool_name] = track_function_call(self.tracker)(tool)
+            # Use different wrapping strategy based on tool type
+            if isinstance(tool, FunctionTool):
+                # For FunctionTool, we need to wrap the invoke callback
+                original_invoke = tool.on_invoke_tool
+
+                async def wrapped_invoke(ctx: ToolContext[Any], input_str: str) -> Any:
+                    start_time = time.time()
+                    try:
+                        # Parse input for logging if possible
+                        try:
+                            args = json.loads(input_str) if input_str else {}
+                        except:
+                            args = {"raw_input": input_str}
+
+                        result = await original_invoke(ctx, input_str)
+
+                        execution_time = time.time() - start_time
+                        self.tracker.log_function_call(
+                            function_name=tool_name,
+                            arguments=args,
+                            result=str(result),
+                            success=True,
+                            execution_time=execution_time,
+                        )
+                        return result
+                    except Exception as e:
+                        execution_time = time.time() - start_time
+                        try:
+                            args = json.loads(input_str) if input_str else {}
+                        except:
+                            args = {"raw_input": input_str}
+
+                        self.tracker.log_function_call(
+                            function_name=tool_name,
+                            arguments=args,
+                            result=str(e),
+                            success=False,
+                            execution_time=execution_time,
+                        )
+                        raise
+
+                # Replace the invoke method on the tool instance
+                # This modifies the tool in place!
+                tool.on_invoke_tool = wrapped_invoke
+
+                # Register as processed
+                self._wrapped_tools[tool_name] = tool
+
+            elif is_tool(tool):
+                # Other tool types that might not be FunctionTool but look like tools
+                self._wrapped_tools[tool_name] = TrackedTool(tool, self.tracker)
+            else:
+                # Raw functions - use cast to avoid type errors
+                self._wrapped_tools[tool_name] = track_function_call(self.tracker)(
+                    cast(Callable, tool)
+                )
 
     def get_wrapped_agent(self) -> Agent:
         """Get the agent with wrapped tools"""
         self.wrap_tools()
 
         if hasattr(self.agent, "tools") and self.agent.tools:
-            tool_list = list(self.agent.tools)
-            self.agent.tools.clear()
-
-            for tool in tool_list:
-                # Handle both FunctionTool objects and raw functions
-                if hasattr(tool, "name"):
-                    tool_name = tool.name
-                elif hasattr(tool, "__name__"):
-                    tool_name = tool.__name__
+            # Check if we need to replace any tools (non-FunctionTool ones that were wrapped)
+            new_tools = []
+            for tool in self.agent.tools:
+                if isinstance(tool, FunctionTool):
+                    new_tools.append(tool)  # Already modified in place
                 else:
-                    tool_name = str(tool)
+                    # Logic to find the name
+                    tool_name = getattr(
+                        tool, "name", getattr(tool, "__name__", str(tool))
+                    )
 
-                if tool_name in self._wrapped_tools:
-                    self.agent.tools.append(self._wrapped_tools[tool_name])
+                    if tool_name in self._wrapped_tools:
+                        new_tools.append(self._wrapped_tools[tool_name])
+                    else:
+                        new_tools.append(tool)
+
+            self.agent.tools = new_tools
 
         return self.agent
 
     async def run_with_tracking(
         self,
-        input: str,
+        input: Union[str, List[Any]],
         trace_id: Optional[str] = None,
         run_config=None,
+        context: Optional[Any] = None,
     ):
         """Run the agent with tracking enabled"""
         if trace_id is None:
@@ -205,10 +329,14 @@ class AgentFunctionWrapper:
 
             wrapped_agent = self.get_wrapped_agent()
 
+            # Handle different input types and arguments compatible with Runner.run
+            kwargs = {}
             if run_config:
-                result = await Runner.run(wrapped_agent, input, run_config=run_config)
-            else:
-                result = await Runner.run(wrapped_agent, input)
+                kwargs["run_config"] = run_config
+            if context:
+                kwargs["context"] = context
+
+            result = await Runner.run(wrapped_agent, input, **kwargs)
 
             return result, trace_id
         finally:
@@ -218,32 +346,52 @@ class AgentFunctionWrapper:
 
     async def _submit_to_langfuse(self, trace_id: str):
         """Submit tracking data to Langfuse"""
-        if not self.langfuse:
+        # Type check to satisfy linter
+        client = self.langfuse
+        if not client:
             return
 
         try:
             stats = self.tracker.get_statistics()
 
-            self.langfuse.create_score(
+            # Helper to safely create scores
+            # Use getattr to bypass static type checking on optional self.langfuse
+            if hasattr(client, "score"):
+                score_func = getattr(client, "score")
+            elif hasattr(client, "create_score"):
+                score_func = getattr(client, "create_score")
+            else:
+                logger.warning("Langfuse client has no score/create_score method")
+                return
+
+            def safe_create_score(**kwargs):
+                score_func(**kwargs)
+
+            # Important: Use numeric values for numeric scores to ensure they appear in charts
+
+            # 1. Success Rate (0-1)
+            safe_create_score(
                 trace_id=trace_id,
-                name="function_call_success_rate",
-                value=stats["success_rate"],
+                name="mcp_function_call_success_rate",
+                value=float(stats["success_rate"]),
                 data_type="NUMERIC",
                 comment=f"Function call success rate for agent {self.agent.name}",
             )
 
-            self.langfuse.create_score(
+            # 2. Total Calls (Integer)
+            safe_create_score(
                 trace_id=trace_id,
-                name="function_call_count",
-                value=stats["total_calls"],
+                name="mcp_function_call_count",
+                value=float(stats["total_calls"]),
                 data_type="NUMERIC",
                 comment=f"Total function calls for agent {self.agent.name}",
             )
 
-            self.langfuse.create_score(
+            # 3. Average Execution Time (Seconds)
+            safe_create_score(
                 trace_id=trace_id,
-                name="average_function_call_time",
-                value=stats["average_execution_time"],
+                name="mcp_average_function_call_time",
+                value=float(stats["average_execution_time"]),
                 data_type="NUMERIC",
                 comment=f"Average function call execution time for agent {self.agent.name}",
             )
@@ -271,9 +419,18 @@ class MultiAgentObserver:
 
     def wrap_agent(self, agent: Agent) -> Agent:
         """Wrap an agent for observation"""
+        if agent.name in self.wrappers:
+            return self.wrappers[agent.name].get_wrapped_agent()
+
         wrapper = AgentFunctionWrapper(agent, langfuse_client=self.langfuse)
         self.wrappers[agent.name] = wrapper
         return wrapper.get_wrapped_agent()
+
+    def get_wrapper(self, agent: Agent) -> AgentFunctionWrapper:
+        """Get or create a wrapper for the agent"""
+        if agent.name not in self.wrappers:
+            self.wrap_agent(agent)
+        return self.wrappers[agent.name]
 
     async def run_agent(
         self,

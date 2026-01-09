@@ -10,7 +10,7 @@ from typing import List, Dict, Any
 from agents import Runner
 
 # Import agents from main.py as the source of truth
-from agents_demo.main import (
+from agents_demo.agents.main import (
     triage_agent,
     faq_agent,
     flight_status_agent,
@@ -19,11 +19,11 @@ from agents_demo.main import (
 )
 
 # Import MCP server components
-from agents_demo.mcp_server import FunctionCallTracker, AgentFunctionWrapper
+from agents_demo.mcp.mcp_server import FunctionCallTracker, AgentFunctionWrapper
 
 # Try to import Qwen config if available
 try:
-    from agents_demo.main_qwen import myRunConfig, OpenAIModel
+    from agents_demo.agents.main_qwen import myRunConfig, OpenAIModel
 except ImportError:
     myRunConfig = None
     OpenAIModel = True

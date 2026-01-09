@@ -9,7 +9,7 @@ import logging
 from typing import Optional, Dict, Any
 
 from .mcp_evaluation import AgentMCPEvaluator
-from .telemetry import Telemetry
+from ..services.telemetry import Telemetry
 
 logger = logging.getLogger(__name__)
 

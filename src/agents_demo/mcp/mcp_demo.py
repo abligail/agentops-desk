@@ -12,7 +12,7 @@ from typing import List
 from agents import Agent, Runner
 
 from .mcp_evaluation import AgentMCPEvaluator, create_mcp_evaluator
-from .telemetry import Telemetry
+from ..services.telemetry import Telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -22,19 +22,24 @@ async def demo_mcp_evaluation_single_agent():
     Demo: Evaluate a single agent using MCP observation
     Demonstrates function call tracking and evaluation
     """
-    from .main_qwen import qwen_model2, myRunConfig, OpenAIModel
-    from .main import faq_agent, faq_lookup_tool
+    from ..agents.main_qwen import qwen_model2, myRunConfig, OpenAIModel
+    from ..agents.main import faq_agent, faq_lookup_tool
 
     logger.info("=== Demo: Single Agent MCP Evaluation ===")
 
     evaluator = create_mcp_evaluator()
 
     if hasattr(faq_agent, "tools") and faq_agent.tools:
+        # Create MCP server for tools (optional, if you want remote access)
         mcp_server = evaluator.create_mcp_server_for_agent(
             agent_name=faq_agent.name,
             tools=faq_agent.tools,
         )
         logger.info(f"Created MCP server for {faq_agent.name}")
+
+        # Wrap the agent to track function calls locally
+        faq_agent = evaluator.wrap_agent(faq_agent)
+        logger.info(f"Wrapped agent {faq_agent.name} for local tracking")
 
     import time
 
@@ -43,12 +48,18 @@ async def demo_mcp_evaluation_single_agent():
     logger.info(f"Running agent with trace ID: {trace_id}")
 
     try:
+        # Start tracking trace
+        evaluator.tracker.start_trace(trace_id, faq_agent.name)
+
         if OpenAIModel:
             result = await Runner.run(faq_agent, "What is the baggage allowance?")
         else:
             result = await Runner.run(
                 faq_agent, "What is the baggage allowance?", run_config=myRunConfig
             )
+
+        # End tracking trace
+        evaluator.tracker.end_trace()
 
         logger.info(f"Agent response: {result.final_output}")
 
@@ -83,8 +94,8 @@ async def demo_mcp_evaluation_multiple_agents():
     Demo: Evaluate multiple agents using MCP observation
     Demonstrates comprehensive evaluation across agent workflow
     """
-    from .main_qwen import qwen_model2, myRunConfig, OpenAIModel
-    from .main import (
+    from ..agents.main_qwen import qwen_model2, myRunConfig, OpenAIModel
+    from ..agents.main import (
         triage_agent,
         faq_agent,
         flight_status_agent,
@@ -102,7 +113,19 @@ async def demo_mcp_evaluation_multiple_agents():
         seat_booking_agent,
     ]
 
+    # Also include cancellation_agent if available
+    try:
+        from ..agents.main import cancellation_agent
+
+        agents_to_wrap.append(cancellation_agent)
+    except ImportError:
+        pass
+
     for agent in agents_to_wrap:
+        # Wrap agent for tracking
+        evaluator.wrap_agent(agent)
+        logger.info(f"Wrapped agent {agent.name} for tracking")
+
         if hasattr(agent, "tools") and agent.tools:
             evaluator.create_mcp_server_for_agent(
                 agent_name=agent.name,
@@ -124,12 +147,61 @@ async def demo_mcp_evaluation_multiple_agents():
         logger.info(f"Trace ID: {trace_id}")
 
         try:
+            # Start tracking trace
+            # Use triage_agent.name because demo_mcp_evaluation_multiple_agents uses triage_agent as entry point
+            # and the logic flows through handoffs.
+            # However, looking closely at how `start_trace` is used in mcp_server.py:
+            #   self.current_traces[agent_name] = trace_id
+            # It sets the trace ID *per agent*.
+            # But the recursive calls inside `triage_agent` will handoff to other agents.
+            # The tool tracking wrapper checks `self.tracker.get_current_trace(self.agent_name)`.
+            # So we need to ensure the trace ID is propagated or set for ALL agents involved in the flow.
+            #
+            # The current implementation of `Tracker` is simple and maps agent_name -> trace_id.
+            # Since `Runner.run` manages the handoffs, we don't manually start traces for the sub-agents here.
+            #
+            # CRITICAL FIX: To ensure ALL wrapped agents use this trace ID, we should iterate and set it for all of them.
+            # In a real distributed system, context propagation would handle this.
+            # For this local demo, we'll manually set the trace context for all known agents.
+
+            # Start trace for the entry point agent
+            evaluator.tracker.start_trace(trace_id, triage_agent.name)
+
+            # ALSO start the same trace for all other agents that might be called via handoff
+            # This ensures that when faq_agent or seat_booking_agent tools are called,
+            # they can find the active trace ID.
+            evaluator.tracker.start_trace(trace_id, faq_agent.name)
+            evaluator.tracker.start_trace(trace_id, flight_status_agent.name)
+            evaluator.tracker.start_trace(trace_id, seat_booking_agent.name)
+            try:
+                from ..agents.main import cancellation_agent
+
+                evaluator.tracker.start_trace(trace_id, cancellation_agent.name)
+            except ImportError:
+                pass
+
+            # Initialize context with fake data for tests that need it
+            context_args = {}
+            if "flight" in test_input or "seat" in test_input:
+                from ..agents.main import AirlineAgentContext
+
+                context = AirlineAgentContext(
+                    flight_number="AA123",
+                    confirmation_number="CONF123",
+                    seat_number="12A",
+                    passenger_name="John Doe",
+                )
+                context_args = {"context": context}
+
             if OpenAIModel:
-                result = await Runner.run(triage_agent, test_input)
+                result = await Runner.run(triage_agent, test_input, **context_args)
             else:
                 result = await Runner.run(
-                    triage_agent, test_input, run_config=myRunConfig
+                    triage_agent, test_input, run_config=myRunConfig, **context_args
                 )
+
+            # End tracking trace
+            evaluator.tracker.end_trace()
 
             logger.info(f"Response: {result.final_output[:200]}...")
 
@@ -159,8 +231,8 @@ async def demo_mcp_with_langfuse():
     Demo: MCP evaluation with Langfuse integration
     Demonstrates how evaluation metrics are submitted to Langfuse
     """
-    from .main_qwen import qwen_model2, myRunConfig, OpenAIModel
-    from .main import faq_agent
+    from ..agents.main_qwen import qwen_model2, myRunConfig, OpenAIModel
+    from ..agents.main import faq_agent
 
     logger.info("=== Demo: MCP Evaluation with Langfuse ===")
 
@@ -192,12 +264,18 @@ async def demo_mcp_with_langfuse():
     logger.info(f"Running agent with Langfuse trace ID: {trace_id}")
 
     try:
+        # Start tracking trace
+        evaluator.tracker.start_trace(trace_id, faq_agent.name)
+
         if OpenAIModel:
             result = await Runner.run(faq_agent, "What is the baggage allowance?")
         else:
             result = await Runner.run(
                 faq_agent, "What is the baggage allowance?", run_config=myRunConfig
             )
+
+        # End tracking trace
+        evaluator.tracker.end_trace()
 
         logger.info(f"Agent response: {result.final_output}")
 
@@ -226,9 +304,14 @@ async def demo_comprehensive_evaluation():
     Demo: Comprehensive evaluation using MCP pattern
     Combines function call tracking, LLM-as-a-Judge, and user feedback
     """
-    from .evaluators import evaluate_response
-    from .main_qwen import qwen_model2, myRunConfig, OpenAIModel
-    from .main import triage_agent
+    from ..services.evaluators import evaluate_response
+    from ..agents.main_qwen import qwen_model2, myRunConfig, OpenAIModel
+    from ..agents.main import (
+        triage_agent,
+        faq_agent,
+        flight_status_agent,
+        seat_booking_agent,
+    )
 
     logger.info("=== Demo: Comprehensive Evaluation ===")
 
@@ -245,11 +328,32 @@ async def demo_comprehensive_evaluation():
 
     mcp_evaluator = create_mcp_evaluator(langfuse_client=langfuse)
 
-    if hasattr(triage_agent, "tools") and triage_agent.tools:
-        mcp_evaluator.create_mcp_server_for_agent(
-            agent_name=triage_agent.name,
-            tools=triage_agent.tools,
-        )
+    # Wrap all agents to ensure tools are tracked by THIS evaluator
+    # This is critical because tools are modified in-place, and we need to overwrite
+    # any wrappers from previous demos with the current tracker.
+    agents_to_wrap = [
+        triage_agent,
+        faq_agent,
+        flight_status_agent,
+        seat_booking_agent,
+    ]
+
+    try:
+        from ..agents.main import cancellation_agent
+
+        agents_to_wrap.append(cancellation_agent)
+    except ImportError:
+        pass
+
+    for agent in agents_to_wrap:
+        mcp_evaluator.wrap_agent(agent)
+        logger.info(f"Wrapped agent {agent.name} for tracking")
+
+        if hasattr(agent, "tools") and agent.tools:
+            mcp_evaluator.create_mcp_server_for_agent(
+                agent_name=agent.name,
+                tools=agent.tools,
+            )
 
     test_queries = [
         ("What is the baggage allowance?", "User asking about baggage policy"),
@@ -264,10 +368,34 @@ async def demo_comprehensive_evaluation():
         logger.info(f"Trace ID: {trace_id}")
 
         try:
+            # Start tracking trace for ALL agents to ensure context propagation
+            # In a real distributed system, context would propagate automatically.
+            # Here, we manually set the trace ID for all agents involved.
+            for agent in agents_to_wrap:
+                mcp_evaluator.tracker.start_trace(trace_id, agent.name)
+
+            # Initialize context with fake data for tests that need it
+            context_args = {}
+            if "flight" in query or "seat" in query:
+                from ..agents.main import AirlineAgentContext
+
+                context = AirlineAgentContext(
+                    flight_number="AA123",
+                    confirmation_number="CONF123",
+                    seat_number="12A",
+                    passenger_name="John Doe",
+                )
+                context_args = {"context": context}
+
             if OpenAIModel:
-                result = await Runner.run(triage_agent, query)
+                result = await Runner.run(triage_agent, query, **context_args)
             else:
-                result = await Runner.run(triage_agent, query, run_config=myRunConfig)
+                result = await Runner.run(
+                    triage_agent, query, run_config=myRunConfig, **context_args
+                )
+
+            # End tracking trace
+            mcp_evaluator.tracker.end_trace()
 
             agent_response = result.final_output
 
@@ -327,9 +455,14 @@ async def run_all_demos():
     logger.info("All demonstrations completed!")
 
 
-if __name__ == "__main__":
+def main():
+    """Synchronous entry point for the script."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     asyncio.run(run_all_demos())
+
+
+if __name__ == "__main__":
+    main()

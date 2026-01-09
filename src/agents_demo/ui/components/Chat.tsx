@@ -117,14 +117,14 @@ export function Chat({
   );
 
   return (
-    <div className="flex flex-col h-full flex-1 bg-white shadow-sm border border-gray-200 border-t-0 rounded-xl">
-      <div className="bg-blue-600 text-white h-12 px-4 flex items-center rounded-t-xl">
-        <h2 className="font-semibold text-sm sm:text-base lg:text-lg">
+    <div className="flex flex-col h-full flex-[0.38] min-w-0 bg-[#EFF2F3] shadow-sm border border-[#B7C3C8] border-t-0 rounded-[18px] overflow-hidden">
+      <div className="bg-[#52B2CD] text-white h-12 px-4 flex items-center rounded-t-[18px]">
+        <h2 className="font-semibold text-base lg:text-lg text-white">
           Customer View
         </h2>
       </div>
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto min-h-0 md:px-4 pt-4 pb-20">
+      <div className="flex-1 overflow-y-auto min-h-0 md:px-4 pt-4 pb-20 bg-[#EFF2F3] space-y-4">
         {messages.map((msg, idx) => {
           if (msg.content === "DISPLAY_SEAT_MAP") return null; // Skip rendering marker message
           const ratingLocked = msg.rating != null;
@@ -136,18 +136,17 @@ export function Chat({
           return (
             <div
               key={msg.id ?? idx}
-              className={`flex mb-5 text-sm ${msg.role === "user" ? "justify-end" : "justify-start"
-                }`}
+              className={`flex text-sm ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {msg.role === "user" ? (
-                <div className="ml-4 rounded-[16px] rounded-br-[4px] px-4 py-2 md:ml-24 bg-black text-white font-light max-w-[80%]">
+                <div className="ml-4 rounded-[16px] rounded-br-[6px] px-4 py-2 md:ml-24 bg-white text-[#0B1517] font-light max-w-[78%] shadow border border-[#B7C3C8]">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
               ) : (
-                <div className="mr-4 rounded-[16px] rounded-bl-[4px] px-4 py-2 md:mr-24 text-zinc-900 bg-[#ECECF1] font-light max-w-[80%]">
+                <div className="mr-4 rounded-[16px] rounded-bl-[6px] px-4 py-2 md:mr-24 text-[#0B1517] bg-white border border-[#B7C3C8] font-light max-w-[78%] shadow-sm">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
                   {msg.agent && (
-                    <div className="text-[11px] text-gray-500 mt-1">via {msg.agent}</div>
+                    <div className="text-[11px] text-[#8C8C8E] mt-1">via {msg.agent}</div>
                   )}
                   {msg.evaluation && (
                     <div className="mt-2 pt-2 border-t border-gray-200">
@@ -197,13 +196,13 @@ export function Chat({
                     </div>
                   )}
                   {msg.role === "assistant" && onFeedback && (
-                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-600">
+                    <div className="flex items-center gap-2 mt-2 text-xs text-[#0B1517]">
                       <span className="text-[11px]">Feedback:</span>
                       <button
                         className={`px-2 py-1 rounded-full border text-[11px] transition ${
                           msg.feedback === "positive"
-                            ? "bg-green-100 border-green-400 text-green-700"
-                            : "border-gray-300 hover:border-green-500"
+                            ? "bg-[#52B2CD]/30 border-[#52B2CD] text-[#0B1517]"
+                            : "border-[#16749D]/40 hover:border-[#52B2CD]"
                         }`}
                         disabled={!msg.traceId || !!msg.feedback}
                         onClick={() => onFeedback(msg.id, msg.traceId, true)}
@@ -213,8 +212,8 @@ export function Chat({
                       <button
                         className={`px-2 py-1 rounded-full border text-[11px] transition ${
                           msg.feedback === "negative"
-                            ? "bg-red-100 border-red-400 text-red-700"
-                            : "border-gray-300 hover:border-red-500"
+                            ? "bg-rose-100 border-rose-400 text-rose-700"
+                            : "border-[#16749D]/40 hover:border-rose-500"
                         }`}
                         disabled={!msg.traceId || !!msg.feedback}
                         onClick={() => onFeedback(msg.id, msg.traceId, false)}
@@ -222,12 +221,12 @@ export function Chat({
                         👎
                       </button>
                       {!msg.traceId && (
-                        <span className="text-[11px] text-gray-400">no trace id</span>
+                        <span className="text-[11px] text-[#8C8C8E]">no trace id</span>
                       )}
                     </div>
                   )}
                   {msg.role === "assistant" && onRatingSubmit && (
-                    <div className="mt-2 text-xs text-gray-600">
+                    <div className="mt-2 text-xs text-[#0B1517]">
                       <div className="flex items-center gap-2">
                         <span className="text-[11px]">Rating:</span>
                         <div className="flex items-center gap-1">
@@ -241,11 +240,11 @@ export function Chat({
                                 key={value}
                                 type="button"
                                 className={`text-base leading-none transition ${
-                                  isActive ? "text-amber-500" : "text-gray-300"
+                                  isActive ? "text-[#16749D]" : "text-[#8C8C8E]"
                                 } ${
                                   feedbackLocked
                                     ? "cursor-default"
-                                    : "hover:text-amber-500"
+                                    : "hover:text-[#52B2CD]"
                                 }`}
                                 disabled={!msg.traceId || feedbackLocked}
                                 onClick={() => handleRatingSelect(msg.id, value)}
@@ -256,24 +255,24 @@ export function Chat({
                           })}
                         </div>
                         {feedbackLocked && (
-                          <span className="text-[11px] text-gray-400">submitted</span>
+                          <span className="text-[11px] text-[#8C8C8E]">submitted</span>
                         )}
                         {!msg.traceId && (
-                          <span className="text-[11px] text-gray-400">no trace id</span>
+                          <span className="text-[11px] text-[#8C8C8E]">no trace id</span>
                         )}
                       </div>
                       <div className="mt-2 flex items-start gap-2">
                         <textarea
                           rows={2}
                           placeholder="文字反馈（可选）"
-                          className="w-full resize-none rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full resize-none rounded-xl border border-[#B7C3C8] px-3 py-2 text-[12px] text-[#0B1517] bg-white focus:outline-none focus:ring-1 focus:ring-[#8FA0A6]"
                           value={draftComments[msg.id] ?? msg.feedbackComment ?? ""}
                           onChange={(e) => handleCommentChange(msg.id, e.target.value)}
                           disabled={!msg.traceId || feedbackLocked}
                         />
                         <button
                           type="button"
-                          className="rounded-md bg-blue-600 px-3 py-1 text-[11px] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300"
+                          className="rounded-xl bg-[#8FA0A6] px-4 py-2 text-[12px] text-white transition hover:bg-[#A9BAC0] disabled:cursor-not-allowed disabled:bg-[#B7C3C8]"
                           disabled={
                             !msg.traceId ||
                             feedbackLocked ||
@@ -314,8 +313,8 @@ export function Chat({
       <div className="p-2 md:px-4">
         <div className="flex items-center">
           <div className="flex w-full items-center pb-4 md:pb-1">
-            <div className="flex w-full flex-col gap-1.5 rounded-2xl p-2.5 pl-1.5 bg-white border border-stone-200 shadow-sm transition-colors">
-              <div className="flex items-end gap-1.5 md:gap-2 pl-4">
+            <div className="flex w-full flex-col gap-2 rounded-[18px] p-3 pl-2 bg-white border border-[#B7C3C8] shadow-sm transition-colors">
+              <div className="flex items-end gap-2 md:gap-3 pl-4">
                 <div className="flex min-w-0 flex-1 flex-col">
                   <textarea
                     id="prompt-textarea"
@@ -323,7 +322,7 @@ export function Chat({
                     dir="auto"
                     rows={2}
                     placeholder="Message..."
-                    className="mb-2 resize-none border-0 focus:outline-none text-sm bg-transparent px-0 pb-6 pt-2"
+                    className="mb-2 resize-none border-0 focus:outline-none text-sm bg-transparent px-0 pb-5 pt-2 text-[#0B1517]"
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -333,7 +332,7 @@ export function Chat({
                 </div>
                 <button
                   disabled={!inputText.trim()}
-                  className="flex h-8 w-8 items-end justify-center rounded-full bg-black text-white hover:opacity-70 disabled:bg-gray-300 disabled:text-gray-400 transition-colors focus:outline-none"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#8FA0A6] text-white hover:bg-[#A9BAC0] disabled:bg-[#B7C3C8] disabled:text-white/70 transition-colors focus:outline-none"
                   onClick={handleSend}
                 >
                   <svg

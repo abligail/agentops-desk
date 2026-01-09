@@ -21,7 +21,7 @@ function formatEventName(type: string) {
 }
 
 function EventIcon({ type }: { type: string }) {
-  const className = "h-4 w-4 text-zinc-600";
+  const className = "h-4 w-4 text-[#CDDCDE]";
   switch (type) {
     case "handoff":
       return <ArrowRightLeft className={className} />;
@@ -38,18 +38,18 @@ function EventIcon({ type }: { type: string }) {
 
 function EventDetails({ event }: { event: AgentEvent }) {
   let details = null;
-  const className =
-    "border border-gray-100 text-xs p-2.5 rounded-md flex flex-col gap-2";
+  const boxClass =
+    "border border-[#16749D]/30 bg-[#F6FAFB] text-xs p-3 rounded-md flex flex-col gap-1.5 whitespace-pre-wrap break-words leading-relaxed text-[#0B1517] max-w-full min-w-0";
   switch (event.type) {
     case "handoff":
       details = event.metadata && (
-        <div className={className}>
-          <div className="text-gray-600">
-            <span className="text-zinc-600 font-medium">From:</span>{" "}
+        <div className={`${boxClass} w-full min-w-0 overflow-x-auto`}>
+          <div>
+            <span className="font-medium">From:</span>{" "}
             {event.metadata.source_agent}
           </div>
-          <div className="text-gray-600">
-            <span className="text-zinc-600 font-medium">To:</span>{" "}
+          <div>
+            <span className="font-medium">To:</span>{" "}
             {event.metadata.target_agent}
           </div>
         </div>
@@ -57,11 +57,9 @@ function EventDetails({ event }: { event: AgentEvent }) {
       break;
     case "tool_call":
       details = event.metadata && event.metadata.tool_args && (
-        <div className={className}>
-          <div className="text-xs text-zinc-600 mb-1 font-medium">
-            Arguments
-          </div>
-          <pre className="text-xs text-gray-600 bg-gray-50 p-2 rounded overflow-x-auto">
+        <div className={`${boxClass} w-full min-w-0 overflow-x-auto`}>
+          <div className="text-xs font-medium text-[#0B1517] mb-1">Arguments</div>
+          <pre className="text-[11px] text-[#0B1517] bg-white border border-[#16749D]/20 p-2 rounded overflow-x-auto whitespace-pre-wrap break-words w-full min-w-0 max-w-full">
             {JSON.stringify(event.metadata.tool_args, null, 2)}
           </pre>
         </div>
@@ -69,9 +67,9 @@ function EventDetails({ event }: { event: AgentEvent }) {
       break;
     case "tool_output":
       details = event.metadata && event.metadata.tool_result && (
-        <div className={className}>
-          <div className="text-xs text-zinc-600 mb-1 font-medium">Result</div>
-          <pre className="text-xs text-gray-600 bg-gray-50 p-2 rounded overflow-x-auto">
+        <div className={`${boxClass} w-full min-w-0 overflow-x-auto`}>
+          <div className="text-xs font-medium text-[#0B1517] mb-1">Result</div>
+          <pre className="text-[11px] text-[#0B1517] bg-white border border-[#16749D]/20 p-2 rounded overflow-x-auto whitespace-pre-wrap break-words w-full min-w-0 max-w-full">
             {JSON.stringify(event.metadata.tool_result, null, 2)}
           </pre>
         </div>
@@ -79,13 +77,11 @@ function EventDetails({ event }: { event: AgentEvent }) {
       break;
     case "context_update":
       details = event.metadata?.changes && (
-        <div className={className}>
+        <div className={`${boxClass} w-full min-w-0 overflow-x-auto`}>
           {Object.entries(event.metadata.changes).map(([key, value]) => (
             <div key={key} className="text-xs">
-              <div className="text-gray-600">
-                <span className="text-zinc-600 font-medium">{key}:</span>{" "}
-                {value ?? "null"}
-              </div>
+              <span className="font-medium">{key}:</span>{" "}
+              <span className="text-[#0B1517]/80">{value ?? "null"}</span>
             </div>
           ))}
         </div>
@@ -96,9 +92,11 @@ function EventDetails({ event }: { event: AgentEvent }) {
   }
 
   return (
-    <div className="mt-1 text-sm">
+    <div className="mt-1 text-sm space-y-2 w-full max-w-full min-w-0">
       {event.content && (
-        <div className="text-gray-700 font-mono mb-2">{event.content}</div>
+        <div className="bg-white border border-[#16749D]/20 rounded-lg px-3 py-2 font-mono text-[12px] text-[#0B1517] whitespace-pre-wrap break-words leading-relaxed shadow-sm overflow-x-auto w-full min-w-0 max-w-full">
+          {event.content}
+        </div>
       )}
       {details}
     </div>
@@ -128,42 +126,43 @@ function TimeBadge({ timestamp }: { timestamp: Date }) {
 export function RunnerOutput({ runnerEvents }: RunnerOutputProps) {
   return (
     <div className="flex-1 overflow-hidden">
-      <PanelSection title="Runner Output" icon={<MessageSquareMore className="h-4 w-4 text-blue-600" />}>
-        <ScrollArea className="h-[calc(100%-2rem)] rounded-md border border-gray-200 bg-gray-100 shadow-sm">
-        <div className="p-4 space-y-3">
-          {runnerEvents.length === 0 ? (
-            <p className="text-center text-zinc-500 p-4">
-              No runner events yet
-            </p>
-          ) : (
-            runnerEvents.map((event) => (
-              <Card
-                key={event.id}
-                className="border border-gray-200 bg-white shadow-sm rounded-lg"
-              >
-                <CardHeader className="flex flex-row justify-between items-center p-4">
-                  <span className="font-medium text-gray-800 text-sm">
-                    {event.agent}
-                  </span>
-                  <TimeBadge timestamp={event.timestamp} />
-                </CardHeader>
+      <PanelSection title="Runner Output" icon={<MessageSquareMore className="h-4 w-4 text-[#52B2CD]" />}>
+        <ScrollArea className="h-[calc(100%-2rem)] rounded-md border border-[#16749D]/40 bg-[#CDDCDE] shadow-sm">
+          <div className="p-4 space-y-3 w-full">
+            {runnerEvents.length === 0 ? (
+              <p className="text-center text-[#0B1517] p-4">
+                No runner events yet
+              </p>
+            ) : (
+              runnerEvents.map((event) => (
+                <div key={event.id} className="w-full">
+                  <Card className="w-full border border-[#16749D]/40 bg-white shadow-sm rounded-lg overflow-hidden">
+                    <CardHeader className="flex flex-row justify-between items-center p-4">
+                      <span className="font-medium text-[#0B1517] text-sm">
+                        {event.agent}
+                      </span>
+                      <TimeBadge timestamp={event.timestamp} />
+                    </CardHeader>
 
-                <CardContent className="flex items-start gap-3 p-4">
-                  <div className="rounded-full p-2 bg-gray-100 flex items-center gap-2">
-                    <EventIcon type={event.type} />
-                    <div className="text-xs text-gray-600">
-                      {formatEventName(event.type)}
-                    </div>
-                  </div>
+                    <CardContent className="flex items-start gap-3 p-4">
+                      <div className="h-8 pl-0 pr-4 rounded-full bg-[#CDDCDE] flex items-center justify-center gap-1.5 border border-[#16749D]/40 flex-shrink-0">
+                        <div className="flex-shrink-0 flex items-center justify-center">
+                          <EventIcon type={event.type} />
+                        </div>
+                        <span className="text-xs font-medium text-[#0B1517] leading-none pt-[1px] whitespace-nowrap">
+                          {formatEventName(event.type)}
+                        </span>
+                      </div>
 
-                  <div className="flex-1">
-                    <EventDetails event={event} />
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+                      <div className="flex-1 min-w-0 space-y-2 overflow-x-auto">
+                        <EventDetails event={event} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ))
+            )}
+          </div>
         </ScrollArea>
       </PanelSection>
     </div>

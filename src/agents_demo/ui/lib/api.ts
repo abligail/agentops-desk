@@ -1,7 +1,9 @@
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+
 // Helper to call the server
 export async function getConversationHistory(conversationId: string) {
   try {
-    const res = await fetch(`/api/history/${conversationId}`);
+    const res = await fetch(`${API_BASE}/api/history/${conversationId}`);
     if (!res.ok) throw new Error(`History API error: ${res.status}`);
     return res.json();
   } catch (err) {
@@ -12,7 +14,7 @@ export async function getConversationHistory(conversationId: string) {
 
 export async function callChatAPI(message: string, conversationId: string) {
   try {
-    const res = await fetch("/api/chat", {
+    const res = await fetch(`${API_BASE}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversation_id: conversationId, message }),
@@ -34,7 +36,7 @@ export async function sendFeedback(payload: {
   comment?: string;
 }) {
   try {
-    const res = await fetch("/api/feedback", {
+    const res = await fetch(`${API_BASE}/api/feedback`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

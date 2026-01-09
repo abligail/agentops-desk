@@ -3731,5 +3731,777 @@
     "feedback": [],
     "updated_at": 1767944466.8255203,
     "created_at": 1767944460.635826
+  },
+  "5a3e181add864dba94aa531e506165cf": {
+    "input_items": [
+      {
+        "role": "assistant",
+        "content": "For context, here is the conversation so far between the user and the previous agent:\n<CONVERSATION HISTORY>\n1. user: 今天的航班会晚点吗\n2. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_a758c3132b024011be36bf\", \"name\": \"transfer_to_flight_status_agent\", \"id\": \"__fake_id__\"}\n3. function_call_output: {\"call_id\": \"call_a758c3132b024011be36bf\", \"output\": \"{\\\"assistant\\\": \\\"Flight Status Agent\\\"}\"}\n</CONVERSATION HISTORY>"
+      },
+      {
+        "arguments": "{}",
+        "call_id": "call_a758c3132b024011be36bf",
+        "name": "transfer_to_flight_status_agent",
+        "type": "function_call",
+        "id": "__fake_id__",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-f09400ea-341e-9e2c-950e-d56bc9453758"
+        }
+      },
+      {
+        "call_id": "call_a758c3132b024011be36bf",
+        "output": "{\"assistant\": \"Flight Status Agent\"}",
+        "type": "function_call_output"
+      },
+      {
+        "id": "__fake_id__",
+        "content": [
+          {
+            "annotations": [],
+            "text": "为了帮您查询航班状态，我需要您的确认号码或账户号码。请问您能提供其中之一吗？",
+            "type": "output_text",
+            "logprobs": []
+          }
+        ],
+        "role": "assistant",
+        "status": "completed",
+        "type": "message",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-386668b1-6f5e-9b98-a84a-a4f1c5b1c953"
+        }
+      }
+    ],
+    "context": {
+      "passenger_name": null,
+      "confirmation_number": null,
+      "seat_number": null,
+      "flight_number": null,
+      "account_number": "82165419",
+      "meal_preference": null,
+      "dietary_restrictions": null,
+      "special_requests": null,
+      "meal_status": "not_requested"
+    },
+    "current_agent": "Flight Status Agent",
+    "trace_history": [
+      {
+        "trace_id": "ed0aeaba32604917838bd9ed061a9f24",
+        "timestamp": 1767953791424.2776,
+        "agent": "Flight Status Agent",
+        "messages": [
+          {
+            "id": "a9200b6e87af48439a97a51d78718d9d",
+            "content": "为了帮您查询航班状态，我需要您的确认号码或账户号码。请问您能提供其中之一吗？",
+            "agent": "Flight Status Agent",
+            "trace_id": "ed0aeaba32604917838bd9ed061a9f24",
+            "timestamp": 1767953793679.7407,
+            "feedback": null,
+            "rating": null,
+            "comment": null,
+            "evaluation": {
+              "helpfulness": 1.0,
+              "accuracy": 1.0,
+              "relevance": 1.0,
+              "overall_score": 1.0,
+              "reasoning": "该回复准确且专业地回应了客户关于航班是否延误的询问，明确指出需要航班确认号或账户号以查询实时状态，符合航空客服的标准流程。信息准确、无误导，且完全围绕航班查询这一核心主题。",
+              "improvement_suggestions": "可进一步补充说明‘如无号码，也可提供航班号、出发城市和日期，我将尽力协助’，以提升客户体验和响应灵活性。"
+            },
+            "mcp_metrics": null
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "8557a24e5c6d45c5b4e40c6bc4e78f16",
+            "name": "Relevance Guardrail",
+            "input": "今天的航班会晚点吗",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767953793679.8596
+          },
+          {
+            "id": "37791826010a489085046b4ad587065e",
+            "name": "Jailbreak Guardrail",
+            "input": "今天的航班会晚点吗",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767953793679.8826
+          }
+        ]
+      }
+    ],
+    "feedback": [],
+    "updated_at": 1767953798.7920682,
+    "created_at": 1767953764.7649715
+  },
+  "a7a9f3129d2f479d9664f0ccd1348228": {
+    "input_items": [],
+    "context": {
+      "passenger_name": null,
+      "confirmation_number": null,
+      "seat_number": null,
+      "flight_number": null,
+      "account_number": "82690151",
+      "meal_preference": null,
+      "dietary_restrictions": null,
+      "special_requests": null,
+      "meal_status": "not_requested"
+    },
+    "current_agent": "Triage Agent",
+    "trace_history": [],
+    "feedback": [],
+    "updated_at": 1767953771.7227283,
+    "created_at": 1767953771.7227283
+  },
+  "9db5415aadf7442e9f2eec9c45d50b71": {
+    "input_items": [
+      {
+        "role": "assistant",
+        "content": "For context, here is the conversation so far between the user and the previous agent:\n<CONVERSATION HISTORY>\n1. user: 今天吃什么\n2. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_b26e675ea7bc4316aafa8d\", \"name\": \"transfer_to_faq_agent\", \"id\": \"__fake_id__\"}\n3. function_call_output: {\"call_id\": \"call_b26e675ea7bc4316aafa8d\", \"output\": \"{\\\"assistant\\\": \\\"FAQ Agent\\\"}\"}\n</CONVERSATION HISTORY>"
+      },
+      {
+        "arguments": "{}",
+        "call_id": "call_b26e675ea7bc4316aafa8d",
+        "name": "transfer_to_faq_agent",
+        "type": "function_call",
+        "id": "__fake_id__",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-cfd2c550-449e-9cba-8d9c-dc716944219a"
+        }
+      },
+      {
+        "call_id": "call_b26e675ea7bc4316aafa8d",
+        "output": "{\"assistant\": \"FAQ Agent\"}",
+        "type": "function_call_output"
+      },
+      {
+        "arguments": "{\"question\": \"今天吃什么\"}",
+        "call_id": "call_fe2de5ad8e7e42ff8721f4",
+        "name": "faq_lookup_tool",
+        "type": "function_call",
+        "id": "__fake_id__",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-fd8a1ef1-a527-9b0e-b745-69efa97baf3a"
+        }
+      },
+      {
+        "call_id": "call_fe2de5ad8e7e42ff8721f4",
+        "output": "I'm sorry, I don't know the answer to that question.",
+        "type": "function_call_output"
+      },
+      {
+        "id": "__fake_id__",
+        "content": [
+          {
+            "annotations": [],
+            "text": "我无法为您推荐今天吃什么，建议您可以根据自己的口味或当地特色来选择哦！",
+            "type": "output_text",
+            "logprobs": []
+          }
+        ],
+        "role": "assistant",
+        "status": "completed",
+        "type": "message",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-f7144be2-4bd3-9173-adbf-9031275a7ed6"
+        }
+      }
+    ],
+    "context": {
+      "passenger_name": null,
+      "confirmation_number": null,
+      "seat_number": null,
+      "flight_number": null,
+      "account_number": "41067425",
+      "meal_preference": null,
+      "dietary_restrictions": null,
+      "special_requests": null,
+      "meal_status": "not_requested"
+    },
+    "current_agent": "FAQ Agent",
+    "trace_history": [
+      {
+        "trace_id": "ff77ee51e43b468d947dd79e184d9e81",
+        "timestamp": 1767953897764.1406,
+        "agent": "FAQ Agent",
+        "messages": [
+          {
+            "id": "8b886a8aaaa74a1496daba0aab4ee859",
+            "content": "我无法为您推荐今天吃什么，建议您可以根据自己的口味或当地特色来选择哦！",
+            "agent": "FAQ Agent",
+            "trace_id": "ff77ee51e43b468d947dd79e184d9e81",
+            "timestamp": 1767953901774.3562,
+            "feedback": null,
+            "rating": null,
+            "comment": null,
+            "evaluation": {
+              "helpfulness": 0.5,
+              "accuracy": 1.0,
+              "relevance": 0.0,
+              "overall_score": 0.3,
+              "reasoning": "The response is accurate and polite, but completely off-topic as the customer's question about 'what to eat today' is unrelated to airline services. The agent failed to recognize the context mismatch and did not redirect or assist with flight-related concerns.",
+              "improvement_suggestions": "The agent should have acknowledged the misalignment by politely clarifying that they assist with flight-related inquiries and offered to help with travel, meals on board, or dietary accommodations if applicable."
+            },
+            "mcp_metrics": null
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "6644f906fe434d00a9666c20606060c6",
+            "name": "Relevance Guardrail",
+            "input": "今天吃什么",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767953901775.0708
+          },
+          {
+            "id": "54e827041184416a84f94e7a7d0a96dc",
+            "name": "Jailbreak Guardrail",
+            "input": "今天吃什么",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767953901775.0903
+          }
+        ]
+      }
+    ],
+    "feedback": [],
+    "updated_at": 1767953905.801571,
+    "created_at": 1767953894.4149706
+  },
+  "5960532da1ce4ffba993a1929161ccfb": {
+    "input_items": [
+      {
+        "role": "assistant",
+        "content": "For context, here is the conversation so far between the user and the previous agent:\n<CONVERSATION HISTORY>\n1. user: 今天吃什么\n2. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_d298759789c9488aa92b4c\", \"name\": \"transfer_to_faq_agent\", \"id\": \"__fake_id__\"}\n3. function_call_output: {\"call_id\": \"call_d298759789c9488aa92b4c\", \"output\": \"{\\\"assistant\\\": \\\"FAQ Agent\\\"}\"}\n</CONVERSATION HISTORY>"
+      },
+      {
+        "arguments": "{}",
+        "call_id": "call_d298759789c9488aa92b4c",
+        "name": "transfer_to_faq_agent",
+        "type": "function_call",
+        "id": "__fake_id__",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-e3dda026-ce2e-914f-83ec-8dfcf394f3e1"
+        }
+      },
+      {
+        "call_id": "call_d298759789c9488aa92b4c",
+        "output": "{\"assistant\": \"FAQ Agent\"}",
+        "type": "function_call_output"
+      },
+      {
+        "arguments": "{\"question\": \"今天吃什么\"}",
+        "call_id": "call_e3a604f79ed34f5ab606c8",
+        "name": "faq_lookup_tool",
+        "type": "function_call",
+        "id": "__fake_id__",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-18a1e3d6-156a-968a-90e3-1857b4abda56"
+        }
+      },
+      {
+        "call_id": "call_e3a604f79ed34f5ab606c8",
+        "output": "I'm sorry, I don't know the answer to that question.",
+        "type": "function_call_output"
+      },
+      {
+        "id": "__fake_id__",
+        "content": [
+          {
+            "annotations": [],
+            "text": "我目前无法为您推荐今天吃什么，建议您根据个人口味或当地特色选择餐食哦！",
+            "type": "output_text",
+            "logprobs": []
+          }
+        ],
+        "role": "assistant",
+        "status": "completed",
+        "type": "message",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-5c7796a1-9ae9-924e-bdfa-bf43fe7f029c"
+        }
+      }
+    ],
+    "context": {
+      "passenger_name": null,
+      "confirmation_number": null,
+      "seat_number": null,
+      "flight_number": null,
+      "account_number": "44191506",
+      "meal_preference": null,
+      "dietary_restrictions": null,
+      "special_requests": null,
+      "meal_status": "not_requested"
+    },
+    "current_agent": "FAQ Agent",
+    "trace_history": [
+      {
+        "trace_id": "d65e155ded9b48398d5b37978b501551",
+        "timestamp": 1767954274779.638,
+        "agent": "FAQ Agent",
+        "messages": [
+          {
+            "id": "429963faa77b4d55b224236954a01aba",
+            "content": "我目前无法为您推荐今天吃什么，建议您根据个人口味或当地特色选择餐食哦！",
+            "agent": "FAQ Agent",
+            "trace_id": "d65e155ded9b48398d5b37978b501551",
+            "timestamp": 1767954278532.9688,
+            "feedback": null,
+            "rating": null,
+            "comment": null,
+            "evaluation": {
+              "helpfulness": 0.5,
+              "accuracy": 1.0,
+              "relevance": 0.0,
+              "overall_score": 0.3,
+              "reasoning": "The response is accurate and politely worded, but completely off-topic — the customer asked about food, not airline services. As an airline FAQ agent, the response fails to address any travel-related context or offer relevant assistance. Even if the question is unrelated, the agent should attempt to redirect to airline support or acknowledge the misalignment.",
+              "improvement_suggestions": "The agent should respond with a polite redirection, such as: 'I'm here to assist with flight-related questions. For dining suggestions, you may want to check local restaurants near your destination — would you like help with your flight itinerary instead?'"
+            },
+            "mcp_metrics": null
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "3beb5f394aca4fb2bb6be2737cd99e5e",
+            "name": "Relevance Guardrail",
+            "input": "今天吃什么",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767954278533.127
+          },
+          {
+            "id": "d14cab5afa084b94865fcb47a503b4cd",
+            "name": "Jailbreak Guardrail",
+            "input": "今天吃什么",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767954278533.1504
+          }
+        ]
+      }
+    ],
+    "feedback": [],
+    "updated_at": 1767954283.6470423,
+    "created_at": 1767954271.5244513
+  },
+  "4a4089152de94757b2be63b457ac027d": {
+    "input_items": [
+      {
+        "role": "assistant",
+        "content": "For context, here is the conversation so far between the user and the previous agent:\n<CONVERSATION HISTORY>\n1. user: 今天的航空餐是是什么\n2. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_cb75ed3a4fb94feba8545b\", \"name\": \"transfer_to_food_service_agent\", \"id\": \"__fake_id__\"}\n3. function_call_output: {\"call_id\": \"call_cb75ed3a4fb94feba8545b\", \"output\": \"{\\\"assistant\\\": \\\"Food Service Agent\\\"}\"}\n</CONVERSATION HISTORY>"
+      },
+      {
+        "arguments": "{}",
+        "call_id": "call_cb75ed3a4fb94feba8545b",
+        "name": "transfer_to_food_service_agent",
+        "type": "function_call",
+        "id": "__fake_id__",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-dd2e9097-e0ab-99ee-8e12-07ca4985d678"
+        }
+      },
+      {
+        "call_id": "call_cb75ed3a4fb94feba8545b",
+        "output": "{\"assistant\": \"Food Service Agent\"}",
+        "type": "function_call_output"
+      },
+      {
+        "id": "__fake_id__",
+        "content": [
+          {
+            "annotations": [],
+            "text": "您好！我是您的机上餐饮服务助手。为了为您提供最合适的餐食选择，请问您的座位号和账户号码是多少？这样我可以查询您的个人信息并了解您的饮食偏好或特殊需求（如过敏、素食、低盐等）。",
+            "type": "output_text",
+            "logprobs": []
+          }
+        ],
+        "role": "assistant",
+        "status": "completed",
+        "type": "message",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-21704a9d-ceae-9389-891d-ec944801788b"
+        }
+      }
+    ],
+    "context": {
+      "passenger_name": null,
+      "confirmation_number": null,
+      "seat_number": null,
+      "flight_number": null,
+      "account_number": "75426237",
+      "meal_preference": null,
+      "dietary_restrictions": null,
+      "special_requests": null,
+      "meal_status": "not_requested"
+    },
+    "current_agent": "Food Service Agent",
+    "trace_history": [
+      {
+        "trace_id": "845c0f8713f94567be65297a34939fc7",
+        "timestamp": 1767954877623.285,
+        "agent": "Food Service Agent",
+        "messages": [
+          {
+            "id": "2c031885ab674e9484b22b630fc796b3",
+            "content": "您好！我是您的机上餐饮服务助手。为了为您提供最合适的餐食选择，请问您的座位号和账户号码是多少？这样我可以查询您的个人信息并了解您的饮食偏好或特殊需求（如过敏、素食、低盐等）。",
+            "agent": "Food Service Agent",
+            "trace_id": "845c0f8713f94567be65297a34939fc7",
+            "timestamp": 1767954882584.3015,
+            "feedback": null,
+            "rating": null,
+            "comment": null,
+            "evaluation": {
+              "helpfulness": 0.5,
+              "accuracy": 1.0,
+              "relevance": 1.0,
+              "overall_score": 0.8,
+              "reasoning": "该回复准确且相关，正确引导客户提供信息以获取个性化餐饮服务，但未直接回答客户关于‘今天航空餐是什么’的直接问题，缺乏基本信息如餐食类型或菜单概览，导致帮助性不足。",
+              "improvement_suggestions": "建议先提供当日餐食的通用信息（如‘今日提供中式午餐和西式晚餐选项’），再询问座位号和饮食偏好，以更快满足客户核心需求。"
+            },
+            "mcp_metrics": null
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "42a957c39660444b806ca98576b8e6e4",
+            "name": "Relevance Guardrail",
+            "input": "今天的航空餐是是什么",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767954882584.4358
+          },
+          {
+            "id": "61466f30b673482a868b761ecad210ad",
+            "name": "Jailbreak Guardrail",
+            "input": "今天的航空餐是是什么",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767954882584.463
+          }
+        ]
+      }
+    ],
+    "feedback": [],
+    "updated_at": 1767954887.8372457,
+    "created_at": 1767954868.382677
+  },
+  "5572a36d4e4345d8a30a6caed614c0c2": {
+    "input_items": [
+      {
+        "role": "assistant",
+        "content": "For context, here is the conversation so far between the user and the previous agent:\n<CONVERSATION HISTORY>\n1. user: 我想取消航班\n2. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_e7d82c5f9100417a8a30ff\", \"name\": \"transfer_to_cancellation_agent\", \"id\": \"__fake_id__\"}\n3. function_call_output: {\"call_id\": \"call_e7d82c5f9100417a8a30ff\", \"output\": \"{\\\"assistant\\\": \\\"Cancellation Agent\\\"}\"}\n</CONVERSATION HISTORY>"
+      },
+      {
+        "arguments": "{}",
+        "call_id": "call_e7d82c5f9100417a8a30ff",
+        "name": "transfer_to_cancellation_agent",
+        "type": "function_call",
+        "id": "__fake_id__",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-c52f279c-32ae-9a52-876a-c4287ba83dba"
+        }
+      },
+      {
+        "call_id": "call_e7d82c5f9100417a8a30ff",
+        "output": "{\"assistant\": \"Cancellation Agent\"}",
+        "type": "function_call_output"
+      },
+      {
+        "id": "__fake_id__",
+        "content": [
+          {
+            "annotations": [],
+            "text": "您的预订确认号是 PSFBEB，航班号是 FLT-238。请问这些信息是否正确？",
+            "type": "output_text",
+            "logprobs": []
+          }
+        ],
+        "role": "assistant",
+        "status": "completed",
+        "type": "message",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-90f7eb50-17a4-9fb5-b7d5-21300e3fd190"
+        }
+      }
+    ],
+    "context": {
+      "passenger_name": null,
+      "confirmation_number": "PSFBEB",
+      "seat_number": null,
+      "flight_number": "FLT-238",
+      "account_number": "89316662",
+      "meal_preference": null,
+      "dietary_restrictions": null,
+      "special_requests": null,
+      "meal_status": "not_requested"
+    },
+    "current_agent": "Cancellation Agent",
+    "trace_history": [
+      {
+        "trace_id": "4dc7704d5ab44184adfaf518ced7a101",
+        "timestamp": 1767955017449.3857,
+        "agent": "Cancellation Agent",
+        "messages": [
+          {
+            "id": "8d0135a2a6b54bf8a0da94189cbb7114",
+            "content": "您的预订确认号是 PSFBEB，航班号是 FLT-238。请问这些信息是否正确？",
+            "agent": "Cancellation Agent",
+            "trace_id": "4dc7704d5ab44184adfaf518ced7a101",
+            "timestamp": 1767955020004.2932,
+            "feedback": null,
+            "rating": null,
+            "comment": null,
+            "evaluation": {
+              "helpfulness": 0.5,
+              "accuracy": 1.0,
+              "relevance": 1.0,
+              "overall_score": 0.8,
+              "reasoning": "该回复准确地确认了客户的预订信息，表明代理已获取相关数据，但未提供取消航班的具体步骤或后续操作指引，因此帮助性不完整。信息准确且与航空服务高度相关。",
+              "improvement_suggestions": "建议在确认信息后，补充说明取消流程，例如：'如需取消，请确认是否已购买可退票产品，或告知您希望获得退款还是改签选项，我将协助您处理。'"
+            },
+            "mcp_metrics": null
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "771401de6e644c21b3b5f1a063ca0348",
+            "name": "Relevance Guardrail",
+            "input": "我想取消航班",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767955020004.4548
+          },
+          {
+            "id": "006f2b096e78470db9b30c9903935179",
+            "name": "Jailbreak Guardrail",
+            "input": "我想取消航班",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767955020004.4768
+          }
+        ]
+      }
+    ],
+    "feedback": [],
+    "updated_at": 1767955025.6278415,
+    "created_at": 1767955005.288489
+  },
+  "2d7839d96edb4e28b6750a129d3ee113": {
+    "input_items": [
+      {
+        "role": "assistant",
+        "content": "For context, here is the conversation so far between the user and the previous agent:\n<CONVERSATION HISTORY>\n1. user: 我想要取消航班\n2. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_8e012eaf307449e2b56e33\", \"name\": \"transfer_to_cancellation_agent\", \"id\": \"__fake_id__\"}\n3. function_call_output: {\"call_id\": \"call_8e012eaf307449e2b56e33\", \"output\": \"{\\\"assistant\\\": \\\"Cancellation Agent\\\"}\"}\n</CONVERSATION HISTORY>"
+      },
+      {
+        "arguments": "{}",
+        "call_id": "call_8e012eaf307449e2b56e33",
+        "name": "transfer_to_cancellation_agent",
+        "type": "function_call",
+        "id": "__fake_id__",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-8f94c513-edb5-93c0-be04-2fab5c3472f1"
+        }
+      },
+      {
+        "call_id": "call_8e012eaf307449e2b56e33",
+        "output": "{\"assistant\": \"Cancellation Agent\"}",
+        "type": "function_call_output"
+      },
+      {
+        "id": "__fake_id__",
+        "content": [
+          {
+            "annotations": [],
+            "text": "To assist you with canceling your flight, I need to confirm your details. Could you please provide your account number? Alternatively, if you already know your confirmation number and flight number, feel free to share them directly.",
+            "type": "output_text",
+            "logprobs": []
+          }
+        ],
+        "role": "assistant",
+        "status": "completed",
+        "type": "message",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-f808e997-aceb-9c0a-a9f0-558a2bedf5c5"
+        }
+      }
+    ],
+    "context": {
+      "passenger_name": null,
+      "confirmation_number": "GJJQ11",
+      "seat_number": null,
+      "flight_number": "FLT-238",
+      "account_number": "24060887",
+      "meal_preference": null,
+      "dietary_restrictions": null,
+      "special_requests": null,
+      "meal_status": "not_requested"
+    },
+    "current_agent": "Cancellation Agent",
+    "trace_history": [
+      {
+        "trace_id": "5d88793d81394a6f9b4832066fb1312a",
+        "timestamp": 1767955515432.868,
+        "agent": "Cancellation Agent",
+        "messages": [
+          {
+            "id": "bd053c6b7fff470fb5b546afb459cd40",
+            "content": "To assist you with canceling your flight, I need to confirm your details. Could you please provide your account number? Alternatively, if you already know your confirmation number and flight number, feel free to share them directly.",
+            "agent": "Cancellation Agent",
+            "trace_id": "5d88793d81394a6f9b4832066fb1312a",
+            "timestamp": 1767955518303.1343,
+            "feedback": null,
+            "rating": null,
+            "comment": null,
+            "evaluation": {
+              "helpfulness": 1.0,
+              "accuracy": 1.0,
+              "relevance": 1.0,
+              "overall_score": 1.0,
+              "reasoning": "The agent appropriately responds to the customer's request to cancel a flight by requesting essential booking details (account, confirmation, or flight number) needed to process the cancellation. The response is accurate, professional, and fully relevant to airline customer service.",
+              "improvement_suggestions": "Consider adding a brief note about potential cancellation fees or refund policies to proactively manage customer expectations, especially if the booking was non-refundable."
+            },
+            "mcp_metrics": null
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "67842917ab9c46d29d4c08e7647d422f",
+            "name": "Relevance Guardrail",
+            "input": "我想要取消航班",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767955518304.321
+          },
+          {
+            "id": "d6492f3c936f4a169c12e7879037ada1",
+            "name": "Jailbreak Guardrail",
+            "input": "我想要取消航班",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767955518304.3496
+          }
+        ]
+      }
+    ],
+    "feedback": [],
+    "updated_at": 1767955521.9870865,
+    "created_at": 1767955506.9664924
+  },
+  "ce0b97beed144635a2e568a62653c31b": {
+    "input_items": [
+      {
+        "role": "assistant",
+        "content": "For context, here is the conversation so far between the user and the previous agent:\n<CONVERSATION HISTORY>\n1. user: 请帮我修改一下座位，我要换到B2\n2. function_call: {\"arguments\": \"{}\", \"call_id\": \"call_ee16ce61e3354977b408aa\", \"name\": \"transfer_to_seat_booking_agent\", \"id\": \"__fake_id__\"}\n3. function_call_output: {\"call_id\": \"call_ee16ce61e3354977b408aa\", \"output\": \"{\\\"assistant\\\": \\\"Seat Booking Agent\\\"}\"}\n</CONVERSATION HISTORY>"
+      },
+      {
+        "arguments": "{}",
+        "call_id": "call_ee16ce61e3354977b408aa",
+        "name": "transfer_to_seat_booking_agent",
+        "type": "function_call",
+        "id": "__fake_id__",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-8b8608b8-5357-9178-aee6-e9c515d93eb1"
+        }
+      },
+      {
+        "call_id": "call_ee16ce61e3354977b408aa",
+        "output": "{\"assistant\": \"Seat Booking Agent\"}",
+        "type": "function_call_output"
+      },
+      {
+        "id": "__fake_id__",
+        "content": [
+          {
+            "annotations": [],
+            "text": "您好！您的确认号码是 P9VVAW。请问您希望更换到哪个座位？您也可以使用交互式座位图来选择您喜欢的座位。",
+            "type": "output_text",
+            "logprobs": []
+          }
+        ],
+        "role": "assistant",
+        "status": "completed",
+        "type": "message",
+        "provider_data": {
+          "model": "qwen3-next-80b-a3b-instruct",
+          "response_id": "chatcmpl-8b7954d2-52ea-9302-9fe3-bb3909273859"
+        }
+      }
+    ],
+    "context": {
+      "passenger_name": null,
+      "confirmation_number": "P9VVAW",
+      "seat_number": null,
+      "flight_number": "FLT-238",
+      "account_number": "36199872",
+      "meal_preference": null,
+      "dietary_restrictions": null,
+      "special_requests": null,
+      "meal_status": "not_requested"
+    },
+    "current_agent": "Seat Booking Agent",
+    "trace_history": [
+      {
+        "trace_id": "9c8e4ceb03be4eb184489ef2d17a6d25",
+        "timestamp": 1767956309985.274,
+        "agent": "Seat Booking Agent",
+        "messages": [
+          {
+            "id": "60dfe07494b74319886597fce7fbf5f4",
+            "content": "您好！您的确认号码是 P9VVAW。请问您希望更换到哪个座位？您也可以使用交互式座位图来选择您喜欢的座位。",
+            "agent": "Seat Booking Agent",
+            "trace_id": "9c8e4ceb03be4eb184489ef2d17a6d25",
+            "timestamp": 1767956312353.8552,
+            "feedback": null,
+            "rating": null,
+            "comment": null,
+            "evaluation": {
+              "helpfulness": 0.5,
+              "accuracy": 1.0,
+              "relevance": 1.0,
+              "overall_score": 0.8,
+              "reasoning": "响应准确且相关，确认了乘客的预订号并提供了座位更改的途径，但未直接处理乘客明确要求更换至B2座位的请求，缺乏具体操作指引或确认是否可实现该换座。",
+              "improvement_suggestions": "建议直接查询B2座位的可用性并告知乘客是否可以成功更换，或提供一键换座选项，而非仅询问期望座位，以提升服务效率。"
+            },
+            "mcp_metrics": null
+          }
+        ],
+        "guardrails": [
+          {
+            "id": "05f3dae098e24e9d807b47343359086f",
+            "name": "Relevance Guardrail",
+            "input": "请帮我修改一下座位，我要换到B2",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767956312354.0413
+          },
+          {
+            "id": "f6638b545b0b41a984c13eea831803bc",
+            "name": "Jailbreak Guardrail",
+            "input": "请帮我修改一下座位，我要换到B2",
+            "reasoning": "",
+            "passed": true,
+            "timestamp": 1767956312354.072
+          }
+        ]
+      }
+    ],
+    "feedback": [],
+    "updated_at": 1767956316.770731,
+    "created_at": 1767956287.6421523
   }
 }

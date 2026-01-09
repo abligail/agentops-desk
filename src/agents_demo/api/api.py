@@ -402,10 +402,10 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
     # ===================================================================================
     # Create Langfuse trace for this interaction (v3 API)
     # ===================================================================================
-    langfuse_trace = None
+    langfuse_span = None
 
     if LANGFUSE_ENABLED and langfuse_client:
-        # Langfuse v3 SDK relies on OpenTelemetry or create_trace_id + observability
+        # Langfuse v3 SDK relies on OpenTelemetry or trace_id + observability
         # It does NOT have a .trace() method on the client instance anymore.
         # Instead, we should use `create_trace` if available (it's not),
         # or simply rely on `trace_id` being passed to scores/generations.
@@ -434,9 +434,42 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
         # to send an event or generation that includes it, or use `update_current_trace`
         # if we were in a context.
 
-        logger.info(
-            f"Using trace ID: {trace_id}. Skipping explicit trace object creation as .trace() is unavailable."
-        )
+        # logger.info(
+        #    f"Using trace ID: {trace_id}. Skipping explicit trace object creation as .trace() is unavailable."
+        # )
+
+        try:
+            # Try to force trace creation by starting a span with that trace_id
+            # This ensures the trace appears in the dashboard even if empty
+            # We use a very short dummy span as the "root" placeholder if needed,
+            # but ideally we just want to establish the trace context.
+
+            # Create a dummy span to initialize the trace in Langfuse
+            # Using the trace_id we generated
+            # trace_context = {"trace_id": trace_id}
+
+            # Start a span and immediately end it just to register the trace
+            # We call it "interaction_root" or similar
+
+            # NOTE: start_span returns a LangfuseSpan, not a context manager.
+            # We should use it directly or use start_as_current_span if we wanted a context manager.
+            # Here we just want to fire and forget to register the trace.
+
+            # Since the client has no .trace() method, we create a span to root the trace
+            langfuse_span = langfuse_client.start_span(
+                name="chat_interaction",
+                # trace_context expects a TraceContext object or dict with specific shape
+                # but passing trace_id via trace_context is how we link it
+                trace_context={"trace_id": trace_id},
+                metadata={"conversation_id": req.conversation_id},
+                input=req.message,
+            )
+            # span.end() - Moved to end of request processing to capture output/usage
+
+            logger.info(f"Initialized trace {trace_id} with root span")
+
+        except Exception as e:
+            logger.warning(f"Failed to create explicit trace object: {e}")
 
     # Fallback: Just log the ID we generated
     logger.info(f"Generated trace ID for this interaction: {trace_id}")
@@ -851,13 +884,45 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
     # ===================================================================================
     # Langfuse Trace Update (Lazy update for ID based traces)
     # ===================================================================================
+
+    # Calculate token usage from Runner result
+    total_input = 0
+    total_output = 0
+    total_count = 0
+
+    if result and hasattr(result, "raw_responses"):
+        for response in result.raw_responses:
+            if hasattr(response, "usage"):
+                usage = response.usage
+                total_input += getattr(usage, "input_tokens", 0) or 0
+                total_output += getattr(usage, "output_tokens", 0) or 0
+                total_count += getattr(usage, "total_tokens", 0) or 0
+
     if LANGFUSE_ENABLED and langfuse_client:
-        # Just flush the client to ensure any background events/scores are sent.
-        # We skipped creating the trace object explicitly because .trace() is unavailable in v3.
         try:
+            # Update and close the span if it exists
+            if langfuse_span:
+                # Update output if we have messages
+                if messages:
+                    langfuse_span.update(output=messages[-1].content)
+
+                # Update usage stats
+                langfuse_span.update(
+                    usage={
+                        "input": total_input,
+                        "output": total_output,
+                        "total": total_count,
+                        "unit": "TOKENS",
+                    }
+                )
+
+                # End the span to finish the trace duration
+                langfuse_span.end()
+
+            # Just flush the client to ensure any background events/scores are sent.
             langfuse_client.flush()
         except Exception as e:
-            logger.warning(f"Failed to flush langfuse client: {e}")
+            logger.warning(f"Failed to update/flush langfuse client: {e}")
 
     # return response for frontend
     return ChatResponse(

@@ -55,6 +55,7 @@ class Telemetry:
         assistant_messages: list[Dict[str, Any]],
         guardrails: list[Dict[str, Any]],
         metadata: Optional[Dict[str, Any]] = None,
+        evaluation: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Persist the trace locally for later analysis/evaluation."""
         payload = {
@@ -65,6 +66,7 @@ class Telemetry:
             "assistant_messages": assistant_messages,
             "guardrails": guardrails,
             "metadata": metadata or {},
+            "evaluation": evaluation,
             "ts": time.time(),
         }
         _append_jsonl(self.trace_log, payload)

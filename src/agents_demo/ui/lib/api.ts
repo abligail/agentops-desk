@@ -1,4 +1,15 @@
 // Helper to call the server
+export async function getConversationHistory(conversationId: string) {
+  try {
+    const res = await fetch(`/api/history/${conversationId}`);
+    if (!res.ok) throw new Error(`History API error: ${res.status}`);
+    return res.json();
+  } catch (err) {
+    console.error("Error fetching history:", err);
+    return null;
+  }
+}
+
 export async function callChatAPI(message: string, conversationId: string) {
   try {
     const res = await fetch("/api/chat", {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AgentPanel } from "@/components/agent-panel";
 import { Chat } from "@/components/Chat";
 import type { Agent, AgentEvent, GuardrailCheck, Message } from "@/lib/types";
-import { callChatAPI, sendFeedback } from "@/lib/api";
+import { callChatAPI, sendFeedback, getConversationHistory } from "@/lib/api";
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -16,6 +16,40 @@ export default function Home() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   // Loading state while awaiting assistant response
   const [isLoading, setIsLoading] = useState(false);
+
+  // Poll for updates to conversation history (e.g. latent evaluation scores)
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const intervalId = setInterval(async () => {
+      const data = await getConversationHistory(conversationId);
+      if (data && data.messages) {
+         // Update messages if we have new evaluation data
+         setMessages((prevMessages) => {
+            const newMessages = [...prevMessages];
+            let changed = false;
+            
+            data.messages.forEach((remoteMsg: any) => {
+               const localMsgIndex = newMessages.findIndex(m => m.id === remoteMsg.id);
+               if (localMsgIndex !== -1) {
+                  // If remote message has evaluation but local doesn't, update it
+                  if (remoteMsg.evaluation && !newMessages[localMsgIndex].evaluation) {
+                     newMessages[localMsgIndex] = {
+                        ...newMessages[localMsgIndex],
+                        evaluation: remoteMsg.evaluation
+                     };
+                     changed = true;
+                  }
+               }
+            });
+            
+            return changed ? newMessages : prevMessages;
+         });
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(intervalId);
+  }, [conversationId]);
 
   // Boot the conversation
   useEffect(() => {
@@ -117,6 +151,8 @@ export default function Home() {
             : m.feedback ?? null,
         rating: m.rating ?? null,
         feedbackComment: m.comment ?? null,
+        evaluation: data.evaluation, // Attach evaluation to the message
+        mcpMetrics: data.mcp_metrics, // Attach MCP metrics
       }));
       setMessages((prev) => [...prev, ...responses]);
     }

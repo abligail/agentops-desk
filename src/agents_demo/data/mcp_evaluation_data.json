@@ -1,0 +1,37 @@
+[
+  {
+    "trace_id": "gen_trace_1767878800_0",
+    "timestamp": "2026-01-08T21:26:42.285550",
+    "user_input": "Order the chicken for me",
+    "error": "Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************2M4A. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}",
+    "success": false
+  },
+  {
+    "trace_id": "gen_trace_1767878802_1",
+    "timestamp": "2026-01-08T21:26:42.676956",
+    "user_input": "Which gate is FLT-238 departing from?",
+    "error": "Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************2M4A. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}",
+    "success": false
+  },
+  {
+    "trace_id": "gen_trace_1767878802_2",
+    "timestamp": "2026-01-08T21:26:43.033189",
+    "user_input": "Check status for flight FLT-789",
+    "error": "Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************2M4A. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}",
+    "success": false
+  },
+  {
+    "trace_id": "gen_trace_1767878803_3",
+    "timestamp": "2026-01-08T21:26:44.050610",
+    "user_input": "Has flight FLT-999 landed?",
+    "error": "Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************2M4A. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}",
+    "success": false
+  },
+  {
+    "trace_id": "gen_trace_1767878804_4",
+    "timestamp": "2026-01-08T21:26:44.417656",
+    "user_input": "I need help",
+    "error": "Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************2M4A. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}",
+    "success": false
+  }
+]

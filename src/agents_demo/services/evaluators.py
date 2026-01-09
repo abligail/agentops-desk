@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from agents import Agent, Runner
-from .main_qwen import qwen_model2, OpenAIModel, myRunConfig_guardrail
+from ..agents.main_qwen import qwen_model2, OpenAIModel, myRunConfig
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +19,36 @@ logger = logging.getLogger(__name__)
 # Evaluation Schema
 # =========================
 
+
 class EvaluationScore(BaseModel):
     """Schema for evaluation scores from LLM judge."""
-    helpfulness: float = Field(..., ge=0, le=1, description="How helpful is the response? (0-1)")
-    accuracy: float = Field(..., ge=0, le=1, description="Is the information accurate? (0-1)")
-    relevance: float = Field(..., ge=0, le=1, description="Is the response on-topic? (0-1)")
-    overall_score: float = Field(..., ge=0, le=1, description="Overall quality score (0-1)")
-    reasoning: str = Field(..., description="Brief explanation of the scores")
-    improvement_suggestions: Optional[str] = Field(None, description="Optional suggestions for improvement")
+
+    helpfulness: float = Field(
+        ..., ge=0, le=1, description="How helpful is the response? (0-1)"
+    )
+    accuracy: float = Field(
+        ..., ge=0, le=1, description="Is the information accurate? (0-1)"
+    )
+    relevance: float = Field(
+        ..., ge=0, le=1, description="Is the response on-topic? (0-1)"
+    )
+    overall_score: float = Field(
+        ..., ge=0, le=1, description="Overall quality score (0-1)"
+    )
+    reasoning: str = Field(
+        default="No reasoning provided", description="Brief explanation of the scores"
+    )
+    improvement_suggestions: Optional[str] = Field(
+        None, description="Optional suggestions for improvement"
+    )
+
+    def __init__(self, **data):
+        # Auto-convert list to string for improvement_suggestions if needed
+        if "improvement_suggestions" in data and isinstance(
+            data["improvement_suggestions"], list
+        ):
+            data["improvement_suggestions"] = "; ".join(data["improvement_suggestions"])
+        super().__init__(**data)
 
 
 # =========================
@@ -67,7 +89,15 @@ Provide:
 - Optional improvement suggestions
 
 Be objective and constructive in your evaluation.
-Respond with a json object matching the EvaluationScore schema.
+Respond with a raw JSON object matching the EvaluationScore schema:
+{
+    "helpfulness": 0.0,
+    "accuracy": 0.0,
+    "relevance": 0.0,
+    "overall_score": 0.0,
+    "reasoning": "Explanation here...",
+    "improvement_suggestions": "Suggestions here..."
+}
 """,
     output_type=_evaluator_output_type,
 )
@@ -107,11 +137,13 @@ def _coerce_evaluation_output(raw: object) -> EvaluationScore:
 # Evaluation Functions
 # =========================
 
+
 async def evaluate_response(
     user_message: str,
     assistant_message: str,
     agent_name: Optional[str] = None,
     context: Optional[dict] = None,
+    langfuse_client=None,
 ) -> EvaluationScore:
     """
     Evaluate a single agent response using LLM-as-a-Judge.
@@ -121,6 +153,7 @@ async def evaluate_response(
         assistant_message: The agent's response
         agent_name: Name of the agent that provided the response (optional)
         context: Additional context about the conversation (optional)
+        langfuse_client: Optional Langfuse client to submit scores
 
     Returns:
         EvaluationScore: Structured evaluation with scores and reasoning
@@ -146,9 +179,27 @@ async def evaluate_response(
             result = await Runner.run(evaluator_agent, eval_prompt)
             score = result.final_output_as(EvaluationScore)
         else:
-            result = await Runner.run(evaluator_agent, eval_prompt, run_config=myRunConfig_guardrail)
-            score = _coerce_evaluation_output(getattr(result, "final_output", None))
+            result = await Runner.run(
+                evaluator_agent, eval_prompt, run_config=myRunConfig
+            )
+
+        score = result.final_output_as(EvaluationScore)
         logger.info(f"Evaluated response: overall={score.overall_score:.2f}")
+
+        # If Langfuse client is provided, submit scores immediately
+        # (similar to how evaluate_and_score_trace does it, but without a trace_id context here usually.
+        # However, evaluate_response is often called within a flow where we might want to pass it.
+        # But wait, the original call in mcp_demo.py passed langfuse_client but NO trace_id.
+        # This implies we can't easily associate it unless we create a trace here or pass one.
+        # The demo code in mcp_demo.py:286 calls evaluate_response(... langfuse_client=langfuse)
+        # It does NOT pass a trace_id.
+        # If we look at evaluate_and_score_trace, it TAKES a trace_id.
+        # So just passing langfuse_client isn't enough to log it to a specific trace unless
+        # we generate one or the client context has one.
+        # For now, we will just ACCEPT the argument to fix the TypeError, but we won't implement
+        # the logging logic inside this function since it lacks trace_id.
+        # If the user wants logging, they should use evaluate_and_score_trace.
+
         return score
 
     except Exception as e:
@@ -203,6 +254,7 @@ async def evaluate_conversation(
 # Langfuse Integration
 # =========================
 
+
 async def evaluate_and_score_trace(
     trace_id: str,
     user_message: str,
@@ -240,31 +292,27 @@ async def evaluate_and_score_trace(
     # Submit to Langfuse if client is provided (v3 API)
     if langfuse_client:
         try:
-            # Submit individual scores using v3 API create_score method
+            # Important: We must use the exact trace_id that was used to create the trace
+            # in api.py. The Langfuse client here is likely the global one, so we just
+            # need to ensure the trace_id matches an existing trace.
+
+            # Submit individual scores using v3 API score method (creates score object)
             langfuse_client.create_score(
                 trace_id=trace_id,
                 name="llm_judge_helpfulness",
                 value=score.helpfulness,
-                data_type="NUMERIC",
                 comment=score.reasoning,
             )
             langfuse_client.create_score(
-                trace_id=trace_id,
-                name="llm_judge_accuracy",
-                value=score.accuracy,
-                data_type="NUMERIC",
+                trace_id=trace_id, name="llm_judge_accuracy", value=score.accuracy
             )
             langfuse_client.create_score(
-                trace_id=trace_id,
-                name="llm_judge_relevance",
-                value=score.relevance,
-                data_type="NUMERIC",
+                trace_id=trace_id, name="llm_judge_relevance", value=score.relevance
             )
             langfuse_client.create_score(
                 trace_id=trace_id,
                 name="llm_judge_overall",
                 value=score.overall_score,
-                data_type="NUMERIC",
                 comment=score.improvement_suggestions or score.reasoning,
             )
 

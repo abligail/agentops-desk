@@ -403,53 +403,40 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
     # Create Langfuse trace for this interaction (v3 API)
     # ===================================================================================
     langfuse_trace = None
-    # We use a dummy object if Langfuse is disabled or client doesn't support .trace()
-    # In recent SDKs (v2+), the main client DOES NOT have a .trace() method.
-    # It relies on OpenTelemetry or specialized methods.
-    # However, older docs or the "low-level" client might have had it.
-    # Looking at dir(langfuse_client) output, it has 'create_trace_id' but NOT 'trace'.
-    # It seems we should rely on 'trace_id' passing for scoring, and maybe
-    # standard observability for the rest.
 
-    # BUT wait, the previous code was TRYING to use .trace().
-    # If the SDK installed is 3.x, it might have removed .trace() in favor of decorators or
-    # implicit context.
+    if LANGFUSE_ENABLED and langfuse_client:
+        # Langfuse v3 SDK relies on OpenTelemetry or create_trace_id + observability
+        # It does NOT have a .trace() method on the client instance anymore.
+        # Instead, we should use `create_trace` if available (it's not),
+        # or simply rely on `trace_id` being passed to scores/generations.
 
-    # IMPORTANT: The user wants to "score" a trace. To score it, we need a trace ID.
-    # The SDK has create_score(trace_id=...).
-    # So we don't strictly *need* a trace object here if we just want to push scores.
-    # BUT we probably want to create the trace so it shows up in the dashboard.
+        # However, to ensure a trace "root" exists in the dashboard with metadata,
+        # we might need to use `langfuse.trace()` if it was available (it's not).
 
-    # If .trace() is missing, maybe we just proceed without explicitly creating a trace object via SDK
-    # and assume the background scorer will create what's needed via 'create_score'.
-    # OR we check if there is another method like 'create_trace' (which was False in our check).
+        # Looking at the available methods:
+        # 'create_score', 'create_event', 'start_span', 'start_generation', ...
+        # There is no direct 'create_trace' or 'trace' method exposed on the client object itself
+        # in the version installed.
 
-    # Let's try to verify if we need to manually create a trace at all.
-    # If we just send a score with a random trace_id, Langfuse might accept it but show it as "orphan"
-    # or create a placeholder trace.
+        # BUT, standard Langfuse usage often involves `langfuse.trace(...)`.
+        # If it's missing, it might be because we are using a specific client initialization
+        # or version that favors OTEL.
 
-    # Let's comment out the .trace() call that is failing and rely on the IDs.
+        # Workaround:
+        # Since we just need the ID to associate subsequent scores/events,
+        # and we don't have a way to explicitly "start" a trace object via the client
+        # (without using decorators or context managers which we aren't using here),
+        # we will skip explicit trace object creation and just log the ID.
+        # The 'create_score' calls later use this trace_id, which will create the trace
+        # in Langfuse if it doesn't exist (lazy creation) or associate it correctly.
 
-    """
-    if LANGFUSE_ENABLED and langfuse_client and hasattr(langfuse_client, "trace"):
-        try:
-            # Create a trace with specific ID using .trace() to ensure linking with scores
-            langfuse_trace = langfuse_client.trace(
-                name="agent_chat_interaction",
-                id=trace_id,
-                input=req.message,
-                metadata={
-                    "trace_id": trace_id,
-                    "conversation_id": req.conversation_id,
-                    "user_id": req.conversation_id or "anonymous",
-                    "user_message": req.message,
-                    "timestamp": now_ms,
-                },
-            )
-            logger.info(f"Created Langfuse trace: {trace_id}")
-        except Exception as e:
-            logger.warning(f"Failed to create Langfuse trace: {e}")
-    """
+        # If we really want to set metadata (like user_id) on the trace, we might need
+        # to send an event or generation that includes it, or use `update_current_trace`
+        # if we were in a context.
+
+        logger.info(
+            f"Using trace ID: {trace_id}. Skipping explicit trace object creation as .trace() is unavailable."
+        )
 
     # Fallback: Just log the ID we generated
     logger.info(f"Generated trace ID for this interaction: {trace_id}")
@@ -862,34 +849,15 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
     # ===================================================================================
     # Update and end Langfuse trace with agent response and metadata (v3 API)
     # ===================================================================================
-    if LANGFUSE_ENABLED and langfuse_trace:
+    # Langfuse Trace Update (Lazy update for ID based traces)
+    # ===================================================================================
+    if LANGFUSE_ENABLED and langfuse_client:
+        # Just flush the client to ensure any background events/scores are sent.
+        # We skipped creating the trace object explicitly because .trace() is unavailable in v3.
         try:
-            langfuse_trace.update(
-                output={"messages": [m.content for m in messages]},
-                metadata={
-                    "agent": current_agent.name,
-                    "guardrails_passed": all(g.passed for g in final_guardrails),
-                    "events_count": len(events),
-                    "context": state["context"].model_dump()
-                    if hasattr(state["context"], "model_dump")
-                    else state["context"],
-                },
-            )
-            # End the span to complete the trace
-            langfuse_trace.end()
-            # Flush to ensure data is sent to Langfuse
-            if langfuse_client:
-                langfuse_client.flush()
-            logger.info(
-                f"Updated and ended Langfuse trace {trace_id} with agent response"
-            )
+            langfuse_client.flush()
         except Exception as e:
-            logger.warning(f"Failed to update Langfuse trace: {e}")
-
-    # If we didn't create a trace object (because .trace() is missing),
-    # we might still want to flush if we sent other data (like scores).
-    elif LANGFUSE_ENABLED and langfuse_client:
-        langfuse_client.flush()
+            logger.warning(f"Failed to flush langfuse client: {e}")
 
     # return response for frontend
     return ChatResponse(

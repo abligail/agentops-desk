@@ -4,8 +4,9 @@ import logging
 import os
 from typing import Any, Optional
 
-from agents import Agent, Runner, ModelSettings
+from agents import Agent, Runner, ModelSettings, OpenAIChatCompletionsModel
 from agents.mcp import MCPServerStreamableHttp
+from openai import AsyncOpenAI
 
 from . import langfuse_client
 
@@ -19,6 +20,26 @@ Use MCP tools to answer questions and manage meal requests:
 - Use record_meal_preference, then confirm_meal_selection after the customer agrees.
 Always pass conversation_id/account_number/confirmation_number/flight_number/seat_number if available.
 """.strip()
+
+
+def _build_eval_model(model_name: Optional[str]) -> OpenAIChatCompletionsModel:
+    use_openai = os.getenv("USE_OPENAI_MODEL", "true").lower() == "true"
+    if use_openai:
+        base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        default_model = os.getenv("OPENAI_MODEL_NAME_MINI", "gpt-4.1-mini")
+    else:
+        base_url = os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+        api_key = os.getenv("QWEN_API_KEY", "")
+        default_model = os.getenv("QWEN_MODEL_NAME_MINI", "qwen3-next-80b-a3b-instruct")
+
+    resolved_model = model_name or default_model
+    if not api_key:
+        raise RuntimeError("Missing API key for evaluation model")
+
+    client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+    logging.info("Eval model: %s (base_url=%s)", resolved_model, base_url)
+    return OpenAIChatCompletionsModel(model=resolved_model, openai_client=client)
 
 
 class InstrumentedMCPServer(MCPServerStreamableHttp):
@@ -66,12 +87,14 @@ def _build_prompt(payload: dict[str, Any]) -> str:
 async def run_agent(
     item,
     system_prompt: str = DEFAULT_SYSTEM_PROMPT,
-    model: str = "gpt-4.1-mini",
+    model: Optional[str] = None,
 ):
     langfuse_client.update_current_trace(input=item.input)
+    logging.info("Food MCP URL: %s", FOOD_MCP_URL)
 
     tool_call_history: list[dict[str, Any]] = []
     trajectory: list[str] = []
+    eval_model = _build_eval_model(model)
 
     async with InstrumentedMCPServer(
         name="food-service-mcp",
@@ -85,7 +108,7 @@ async def run_agent(
         agent = Agent(
             name="FoodServiceEvalAgent",
             instructions=system_prompt,
-            model=model,
+            model=eval_model,
             mcp_servers=[server],
             model_settings=ModelSettings(tool_choice="required"),
         )

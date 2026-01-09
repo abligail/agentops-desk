@@ -21,6 +21,17 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP("Food Service MCP")
 
 
+def _resolve_asgi_app(server: FastMCP):
+    for attr in ("app", "asgi_app", "_app"):
+        app = getattr(server, attr, None)
+        if app is not None:
+            return app
+    return server
+
+
+app = _resolve_asgi_app(mcp)
+
+
 def _infer_cabin_class(flight_number: str, seat_number: Optional[str]) -> str:
     if not flight_number or not seat_number:
         return "economy"
@@ -176,6 +187,16 @@ def main() -> None:
     if "port" in run_sig.parameters or accepts_kwargs:
         kwargs["port"] = port
 
+    if "host" not in kwargs or "port" not in kwargs:
+        if transport == "streamable-http":
+            try:
+                import uvicorn
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.error("uvicorn is required to bind host/port: %s", exc)
+                raise
+            logger.info("Starting Food MCP server on %s:%s (%s)", host, port, transport)
+            uvicorn.run(app, host=host, port=port)
+            return
     if "host" in kwargs and "port" in kwargs:
         logger.info("Starting Food MCP server on %s:%s (%s)", host, port, transport)
     else:

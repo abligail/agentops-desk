@@ -188,17 +188,28 @@ class ChatResponse(BaseModel):
 # Persistent conversation store instance
 #===================================================================================
 data_dir = Path(__file__).resolve().parent / "data"
-conversation_store = CompositeConversationStore(
-	PostgresConversationStore(
+primary_store = None
+try:
+	primary_store = PostgresConversationStore(
 		context_loader=lambda payload: AirlineAgentContext(**payload),
 		seed_path=data_dir / "conversations.json",
-	),
-	JsonConversationStore(
-		data_dir / "conversations.json",
-		context_loader=lambda payload: AirlineAgentContext(**payload),
-	),
-	sync_secondary_from_primary=True,
+	)
+except Exception as exc:
+	logger.warning("Postgres store unavailable, using JSON store only: %s", exc)
+
+json_store = JsonConversationStore(
+	data_dir / "conversations.json",
+	context_loader=lambda payload: AirlineAgentContext(**payload),
 )
+
+if primary_store is None:
+	conversation_store = json_store
+else:
+	conversation_store = CompositeConversationStore(
+		primary_store,
+		json_store,
+		sync_secondary_from_primary=True,
+	)
 
 #===================================================================================
 # Telemetry for trace logging and feedback forwarding
@@ -340,6 +351,8 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
 	if is_new:
 		conversation_id: str = uuid4().hex
 		ctx = create_initial_context()   #flight booking context
+		if hasattr(ctx, "conversation_id"):
+			ctx.conversation_id = conversation_id
 		current_agent_name = triage_agent.name
 
 		#========================================
@@ -372,6 +385,11 @@ async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks):
 		if existing_state is None:
 			raise HTTPException(status_code=404, detail="Conversation not found")
 		state = existing_state
+		ctx = state.get("context")
+		if hasattr(ctx, "conversation_id") and not getattr(ctx, "conversation_id", None):
+			ctx.conversation_id = conversation_id
+		elif isinstance(ctx, dict):
+			ctx.setdefault("conversation_id", conversation_id)
 
 	#=============================================
 	# prepare parameters for Runner

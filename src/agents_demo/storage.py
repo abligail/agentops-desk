@@ -6,6 +6,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
+from uuid import uuid4
 
 import psycopg
 from psycopg.types.json import Json
@@ -91,6 +92,146 @@ PG_DSN = (
     f"host={PG_HOST} port={PG_PORT} dbname={PG_DB} "
     f"user={PG_USER} password={PG_PASSWORD}"
 )
+
+_MEAL_SCHEMA_LOCK = threading.Lock()
+_MEAL_SCHEMA_READY = False
+
+
+def _ensure_meal_orders_schema(dsn: str = PG_DSN) -> None:
+    global _MEAL_SCHEMA_READY
+    if _MEAL_SCHEMA_READY:
+        return
+    with _MEAL_SCHEMA_LOCK:
+        if _MEAL_SCHEMA_READY:
+            return
+        with psycopg.connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS meal_orders (
+                        order_id TEXT PRIMARY KEY,
+                        order_key TEXT,
+                        conversation_id TEXT,
+                        account_number TEXT,
+                        confirmation_number TEXT,
+                        flight_number TEXT,
+                        seat_number TEXT,
+                        meal_choice TEXT,
+                        dietary_notes TEXT,
+                        special_requests TEXT,
+                        status TEXT NOT NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    );
+                    """
+                )
+                cur.execute("ALTER TABLE meal_orders ADD COLUMN IF NOT EXISTS order_id TEXT")
+                cur.execute("ALTER TABLE meal_orders ADD COLUMN IF NOT EXISTS order_key TEXT")
+                cur.execute("ALTER TABLE meal_orders DROP CONSTRAINT IF EXISTS meal_orders_pkey")
+                cur.execute(
+                    """
+                    UPDATE meal_orders
+                    SET order_id = COALESCE(order_id, md5(random()::text || clock_timestamp()::text))
+                    WHERE order_id IS NULL
+                    """
+                )
+                cur.execute("ALTER TABLE meal_orders ALTER COLUMN order_id SET NOT NULL")
+                cur.execute("ALTER TABLE meal_orders ADD PRIMARY KEY (order_id)")
+        _MEAL_SCHEMA_READY = True
+
+
+def _derive_meal_order_key(
+    *,
+    conversation_id: Optional[str],
+    account_number: Optional[str],
+    confirmation_number: Optional[str],
+    flight_number: Optional[str],
+) -> str:
+    parts = []
+    if confirmation_number:
+        parts.append(f"conf:{confirmation_number}")
+    if account_number:
+        parts.append(f"acct:{account_number}")
+    if flight_number:
+        parts.append(f"flt:{flight_number}")
+    if parts:
+        return "|".join(parts)
+    if conversation_id:
+        return f"conv:{conversation_id}"
+    return f"auto:{uuid4().hex}"
+
+
+def record_meal_order(
+    *,
+    conversation_id: Optional[str],
+    account_number: Optional[str],
+    confirmation_number: Optional[str],
+    flight_number: Optional[str],
+    seat_number: Optional[str],
+    meal_choice: Optional[str],
+    dietary_notes: Optional[str],
+    special_requests: Optional[str],
+    status: str,
+    order_key: Optional[str] = None,
+    dsn: str = PG_DSN,
+) -> bool:
+    """Persist a meal order record into Postgres (best-effort)."""
+    if not status:
+        return False
+    order_id = uuid4().hex
+    resolved_key = order_key or _derive_meal_order_key(
+        conversation_id=conversation_id,
+        account_number=account_number,
+        confirmation_number=confirmation_number,
+        flight_number=flight_number,
+    )
+    try:
+        _ensure_meal_orders_schema(dsn)
+        now = time.time()
+        with psycopg.connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO meal_orders (
+                        order_id,
+                        order_key,
+                        conversation_id,
+                        account_number,
+                        confirmation_number,
+                        flight_number,
+                        seat_number,
+                        meal_choice,
+                        dietary_notes,
+                        special_requests,
+                        status,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        to_timestamp(%s), to_timestamp(%s)
+                    )
+                    """,
+                    (
+                        order_id,
+                        resolved_key,
+                        conversation_id,
+                        account_number,
+                        confirmation_number,
+                        flight_number,
+                        seat_number,
+                        meal_choice,
+                        dietary_notes,
+                        special_requests,
+                        status,
+                        now,
+                        now,
+                    ),
+                )
+        return True
+    except Exception as exc:  # pragma: no cover - environment dependent
+        logger.warning("Failed to record meal order: %s", exc)
+        return False
 
 
 class PostgresConversationStore(ConversationStore):

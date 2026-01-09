@@ -20,6 +20,7 @@ from agents_demo.data_loader import (
     get_special_dietary_options,
 )
 from .seat_assignments import seat_assignment_store
+from .storage import record_meal_order
 
 
 # Load environment variables from .env file
@@ -125,6 +126,7 @@ from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 
 class AirlineAgentContext(BaseModel):
 	"""Context for airline customer service agents."""
+	conversation_id: str | None = None
 	passenger_name: str | None = None
 	confirmation_number: str | None = None
 	seat_number: str | None = None
@@ -380,6 +382,17 @@ async def record_meal_preference(
     ctx.dietary_restrictions = dietary_notes
     ctx.special_requests = special_requests
     ctx.meal_status = "pending_confirmation"
+    record_meal_order(
+        conversation_id=ctx.conversation_id,
+        account_number=ctx.account_number,
+        confirmation_number=ctx.confirmation_number,
+        flight_number=ctx.flight_number,
+        seat_number=ctx.seat_number,
+        meal_choice=meal_choice,
+        dietary_notes=dietary_notes,
+        special_requests=special_requests,
+        status=ctx.meal_status,
+    )
     return (
         f"Saved meal choice '{meal_choice}'. "
         f"Dietary notes: {dietary_notes or 'none'}. "
@@ -472,8 +485,20 @@ async def confirm_meal_selection(
     context: RunContextWrapper[AirlineAgentContext], choice: str
 ) -> str:
     """Confirm the chosen meal and update context."""
-    context.context.meal_preference = choice
-    context.context.meal_status = "ordered"
+    ctx = context.context
+    ctx.meal_preference = choice
+    ctx.meal_status = "ordered"
+    record_meal_order(
+        conversation_id=ctx.conversation_id,
+        account_number=ctx.account_number,
+        confirmation_number=ctx.confirmation_number,
+        flight_number=ctx.flight_number,
+        seat_number=ctx.seat_number,
+        meal_choice=choice,
+        dietary_notes=ctx.dietary_restrictions,
+        special_requests=ctx.special_requests,
+        status=ctx.meal_status,
+    )
     return f"Meal preference '{choice}' confirmed and added to the booking."
 
 

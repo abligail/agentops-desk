@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import type { Agent, AgentEvent, GuardrailCheck } from "@/lib/types";
 import { AgentsList } from "./agents-list";
 import { Guardrails } from "./guardrails";
@@ -32,16 +32,18 @@ export function AgentPanel({
   const runnerEvents = events.filter((e) => e.type !== "message");
 
   return (
-    <div className="w-3/5 h-full flex flex-col border-r border-gray-200 bg-white rounded-xl shadow-sm">
-      <div className="bg-blue-600 text-white h-12 px-4 flex items-center gap-3 shadow-sm rounded-t-xl">
-        <Bot className="h-5 w-5" />
-        <h1 className="font-semibold text-sm sm:text-base lg:text-lg">Agent View</h1>
-        <span className="ml-auto text-xs font-light tracking-wide opacity-80">
-          Airline&nbsp;Co.
+    <div className="flex-[0.62] min-w-0 h-full flex flex-col bg-[#EFF2F3] border border-[#B7C3C8] rounded-2xl shadow-xl overflow-hidden">
+      <div className="bg-[#52B2CD] text-white h-12 px-4 flex items-center gap-3 shadow-md">
+        <div className="flex items-center justify-center h-8 w-8 rounded-full bg-white/75">
+          <Sparkles className="h-5 w-5 text-[#0B1517]" />
+        </div>
+        <h1 className="font-semibold text-sm sm:text-base lg:text-lg text-white">Agent View</h1>
+        <span className="ml-auto text-xs font-medium tracking-wide text-white/80">
+          Airline • Orchestrator
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+      <div className="flex-1 overflow-y-auto p-6 bg-[#EFF2F3]">
         <AgentsList agents={agents} currentAgent={currentAgent} />
         <Guardrails
           guardrails={guardrails}

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 import logging
 import os
 from typing import Any, Dict, Optional
@@ -18,18 +17,20 @@ from agents_demo.storage import record_meal_order
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("Food Service MCP")
+# Read host/port at construction time so FastMCP picks them up.
+_HOST = os.getenv("FOOD_MCP_HOST", "127.0.0.1")
+_PORT = int(os.getenv("FOOD_MCP_PORT", "8007"))
+_TRANSPORT = os.getenv("FOOD_MCP_TRANSPORT", "streamable-http")
 
+mcp = FastMCP(
+    "Food Service MCP",
+    host=_HOST,
+    port=_PORT,
+    streamable_http_path="/mcp",
+)
 
-def _resolve_asgi_app(server: FastMCP):
-    for attr in ("app", "asgi_app", "_app"):
-        app = getattr(server, attr, None)
-        if app is not None:
-            return app
-    return server
-
-
-app = _resolve_asgi_app(mcp)
+# Build ASGI app for uvicorn when using streamable-http.
+app = mcp.streamable_http_app()
 
 
 def _infer_cabin_class(flight_number: str, seat_number: Optional[str]) -> str:
@@ -172,39 +173,19 @@ def confirm_meal_selection(
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    host = os.getenv("FOOD_MCP_HOST", "127.0.0.1")
-    port = int(os.getenv("FOOD_MCP_PORT", "8007"))
-    transport = os.getenv("FOOD_MCP_TRANSPORT", "streamable-http")
-    run_sig = inspect.signature(mcp.run)
-    accepts_kwargs = any(
-        param.kind == inspect.Parameter.VAR_KEYWORD for param in run_sig.parameters.values()
-    )
-    kwargs = {}
-    if "transport" in run_sig.parameters or accepts_kwargs:
-        kwargs["transport"] = transport
-    if "host" in run_sig.parameters or accepts_kwargs:
-        kwargs["host"] = host
-    if "port" in run_sig.parameters or accepts_kwargs:
-        kwargs["port"] = port
+    if _TRANSPORT != "streamable-http":
+        logger.info("Starting Food MCP server transport=%s (stdio/sse handled by FastMCP)", _TRANSPORT)
+        mcp.run(transport=_TRANSPORT)
+        return
 
-    if "host" not in kwargs or "port" not in kwargs:
-        if transport == "streamable-http":
-            try:
-                import uvicorn
-            except Exception as exc:  # pragma: no cover - defensive
-                logger.error("uvicorn is required to bind host/port: %s", exc)
-                raise
-            logger.info("Starting Food MCP server on %s:%s (%s)", host, port, transport)
-            uvicorn.run(app, host=host, port=port)
-            return
-    if "host" in kwargs and "port" in kwargs:
-        logger.info("Starting Food MCP server on %s:%s (%s)", host, port, transport)
-    else:
-        logger.info(
-            "Starting Food MCP server with transport=%s (host/port handled by MCP defaults)",
-            transport,
-        )
-    mcp.run(**kwargs)
+    try:
+        import uvicorn
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.error("uvicorn is required for streamable-http: %s", exc)
+        raise
+
+    logger.info("Starting Food MCP server on %s:%s (%s)", _HOST, _PORT, _TRANSPORT)
+    uvicorn.run(app, host=_HOST, port=_PORT)
 
 
 if __name__ == "__main__":

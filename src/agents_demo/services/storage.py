@@ -420,7 +420,13 @@ class JsonConversationStore(ConversationStore):
 
         try:
             self.path.write_text(
-                json.dumps(self._cache, ensure_ascii=False, indent=2, default=_json_fallback)
+                json.dumps(
+                    self._cache,
+                    ensure_ascii=False,
+                    indent=2,
+                    default=_json_fallback,
+                ),
+                encoding="utf-8",
             )
         except Exception as exc:  # pragma: no cover - best-effort persistence
             logger.error("Failed to persist conversation store: %s", exc)

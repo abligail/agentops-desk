@@ -245,6 +245,8 @@ async def _connect_food_mcp() -> None:
         try:
             await FOOD_MCP_SERVER.connect()
             logger.info("Food MCP server connected")
+        except asyncio.CancelledError as exc:
+            logger.warning("Food MCP connection cancelled; continuing without it: %s", exc)
         except Exception as exc:
             logger.warning("Failed to connect Food MCP server: %s", exc)
 

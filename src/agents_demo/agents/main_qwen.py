@@ -633,8 +633,11 @@ async def on_seat_booking_handoff(
 class RelevanceOutput(BaseModel):
     """Schema for relevance guardrail decisions."""
 
-    reasoning: str
+    reasoning: str | None = None
     is_relevant: bool
+
+
+_guardrail_output_type = RelevanceOutput
 
 
 guardrail_agent = Agent(
@@ -687,8 +690,11 @@ async def relevance_guardrail(
 class JailbreakOutput(BaseModel):
     """Schema for jailbreak guardrail decisions."""
 
-    reasoning: str
+    reasoning: str | None = None
     is_safe: bool
+
+
+_jailbreak_output_type = JailbreakOutput
 
 
 jailbreak_guardrail_agent = Agent(

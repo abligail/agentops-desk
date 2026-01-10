@@ -181,7 +181,7 @@ async def demo_mcp_evaluation_multiple_agents():
                 pass
 
             # Initialize context with fake data for tests that need it
-            context_args = {}
+            context = None
             if "flight" in test_input or "seat" in test_input:
                 from ..agents.main import AirlineAgentContext
 
@@ -191,13 +191,12 @@ async def demo_mcp_evaluation_multiple_agents():
                     seat_number="12A",
                     passenger_name="John Doe",
                 )
-                context_args = {"context": context}
 
             if OpenAIModel:
-                result = await Runner.run(triage_agent, test_input, **context_args)
+                result = await Runner.run(triage_agent, test_input, context=context)
             else:
                 result = await Runner.run(
-                    triage_agent, test_input, run_config=myRunConfig, **context_args
+                    triage_agent, test_input, run_config=myRunConfig, context=context
                 )
 
             # End tracking trace
@@ -375,7 +374,7 @@ async def demo_comprehensive_evaluation():
                 mcp_evaluator.tracker.start_trace(trace_id, agent.name)
 
             # Initialize context with fake data for tests that need it
-            context_args = {}
+            context = None
             if "flight" in query or "seat" in query:
                 from ..agents.main import AirlineAgentContext
 
@@ -385,13 +384,12 @@ async def demo_comprehensive_evaluation():
                     seat_number="12A",
                     passenger_name="John Doe",
                 )
-                context_args = {"context": context}
 
             if OpenAIModel:
-                result = await Runner.run(triage_agent, query, **context_args)
+                result = await Runner.run(triage_agent, query, context=context)
             else:
                 result = await Runner.run(
-                    triage_agent, query, run_config=myRunConfig, **context_args
+                    triage_agent, query, run_config=myRunConfig, context=context
                 )
 
             # End tracking trace

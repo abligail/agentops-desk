@@ -269,18 +269,28 @@ async def evaluate_and_score_trace(
                 name="llm_judge_helpfulness",
                 value=score.helpfulness,
                 comment=score.reasoning,
+                data_type="NUMERIC",
             )
             langfuse_client.create_score(
-                trace_id=trace_id, name="llm_judge_accuracy", value=score.accuracy
+                trace_id=trace_id,
+                name="llm_judge_accuracy",
+                value=score.accuracy,
+                comment=score.reasoning,
+                data_type="NUMERIC",
             )
             langfuse_client.create_score(
-                trace_id=trace_id, name="llm_judge_relevance", value=score.relevance
+                trace_id=trace_id,
+                name="llm_judge_relevance",
+                value=score.relevance,
+                comment=score.reasoning,
+                data_type="NUMERIC",
             )
             langfuse_client.create_score(
                 trace_id=trace_id,
                 name="llm_judge_overall",
                 value=score.overall_score,
                 comment=score.improvement_suggestions or score.reasoning,
+                data_type="NUMERIC",
             )
 
             logger.info(f"Submitted LLM judge scores to Langfuse for trace {trace_id}")

@@ -17,6 +17,23 @@ from ..services.telemetry import Telemetry
 logger = logging.getLogger(__name__)
 
 
+def _get_langfuse_client():
+    """Helper to safely get Langfuse client"""
+    try:
+        from langfuse import get_client
+
+        client = get_client()
+        # Verify authentication
+        if client.auth_check():
+            return client
+        else:
+            logger.warning("Langfuse authentication check failed")
+            return None
+    except Exception as e:
+        logger.warning(f"Failed to initialize Langfuse client: {e}")
+        return None
+
+
 async def demo_mcp_evaluation_single_agent():
     """
     Demo: Evaluate a single agent using MCP observation
@@ -27,7 +44,12 @@ async def demo_mcp_evaluation_single_agent():
 
     logger.info("=== Demo: Single Agent MCP Evaluation ===")
 
-    evaluator = create_mcp_evaluator()
+    # Initialize Langfuse if available
+    langfuse = _get_langfuse_client()
+    if langfuse:
+        logger.info("Langfuse integration enabled for this demo")
+
+    evaluator = create_mcp_evaluator(langfuse_client=langfuse)
 
     if hasattr(faq_agent, "tools") and faq_agent.tools:
         # Create MCP server for tools (optional, if you want remote access)
@@ -42,8 +64,10 @@ async def demo_mcp_evaluation_single_agent():
         logger.info(f"Wrapped agent {faq_agent.name} for local tracking")
 
     import time
+    from uuid import uuid4
 
-    trace_id = f"demo_trace_{int(time.time() * 1000)}"
+    # Langfuse requires 32-char hex string for trace IDs
+    trace_id = uuid4().hex
 
     logger.info(f"Running agent with trace ID: {trace_id}")
 
@@ -83,6 +107,10 @@ async def demo_mcp_evaluation_single_agent():
         logger.info(f"Avg execution time: {evaluation['average_execution_time']:.4f}s")
         logger.info(f"\nFunction usage: {evaluation['function_usage']}")
 
+        if langfuse:
+            langfuse.flush()
+            logger.info("Metrics flushed to Langfuse")
+
     except Exception as e:
         logger.error(f"Demo failed: {e}")
 
@@ -104,7 +132,12 @@ async def demo_mcp_evaluation_multiple_agents():
 
     logger.info("=== Demo: Multiple Agents MCP Evaluation ===")
 
-    evaluator = create_mcp_evaluator()
+    # Initialize Langfuse if available
+    langfuse = _get_langfuse_client()
+    if langfuse:
+        logger.info("Langfuse integration enabled for this demo")
+
+    evaluator = create_mcp_evaluator(langfuse_client=langfuse)
 
     agents_to_wrap = [
         triage_agent,
@@ -141,8 +174,11 @@ async def demo_mcp_evaluation_multiple_agents():
 
     for i, test_input in enumerate(test_cases):
         import time
+        from uuid import uuid4
 
-        trace_id = f"multi_agent_trace_{i}_{int(time.time() * 1000)}"
+        # Langfuse requires 32-char hex string for trace IDs
+        trace_id = uuid4().hex
+
         logger.info(f"\n--- Test Case {i + 1}: {test_input} ---")
         logger.info(f"Trace ID: {trace_id}")
 
@@ -207,6 +243,12 @@ async def demo_mcp_evaluation_multiple_agents():
             calls = evaluator.tracker.get_calls_by_trace(trace_id)
             logger.info(f"Function calls in this trace: {len(calls)}")
 
+            # Evaluate and submit to Langfuse
+            await evaluator.evaluate_agent_trace(
+                trace_id=trace_id,
+                agent_name=triage_agent.name,
+            )
+
         except Exception as e:
             logger.error(f"Test case {i + 1} failed: {e}")
 
@@ -221,6 +263,10 @@ async def demo_mcp_evaluation_multiple_agents():
     logger.info("\nAgent usage:")
     for agent_name, count in sorted(stats["agent_usage"].items()):
         logger.info(f"  - {agent_name}: {count} calls")
+
+    if langfuse:
+        langfuse.flush()
+        logger.info("Metrics flushed to Langfuse")
 
     return evaluator
 
@@ -257,9 +303,9 @@ async def demo_mcp_with_langfuse():
             tools=faq_agent.tools,
         )
 
-    import time
+    from uuid import uuid4
 
-    trace_id = f"langfuse_demo_{int(time.time() * 1000)}"
+    trace_id = uuid4().hex
     logger.info(f"Running agent with Langfuse trace ID: {trace_id}")
 
     try:
@@ -357,14 +403,55 @@ async def demo_comprehensive_evaluation():
     test_queries = [
         ("What is the baggage allowance?", "User asking about baggage policy"),
         ("I want to change my seat", "User wants seat change"),
+        ("How do I cancel my flight?", "Cancellation inquiry"),
+        ("What are the meal options?", "Meal inquiry"),
+        ("Is my flight on time?", "Flight status inquiry"),
+        ("Can I upgrade to business class?", "Upgrade inquiry"),
+        ("How much is extra baggage?", "Baggage fee inquiry"),
+        ("Do you have vegetarian meals?", "Dietary inquiry"),
+        ("What is the check-in time?", "Check-in inquiry"),
+        ("Can I bring my pet?", "Pet policy inquiry"),
+        ("How do I claim miles?", "Miles inquiry"),
+        ("Where is the lounge?", "Lounge inquiry"),
+        ("Is there wifi on board?", "Wifi inquiry"),
+        ("Can I get a refund?", "Refund inquiry"),
+        ("What movies are playing?", "Entertainment inquiry"),
+        ("I lost my luggage", "Lost luggage inquiry"),
+        ("Can I change my date?", "Date change inquiry"),
+        ("Is there a student discount?", "Discount inquiry"),
+        ("How do I request wheelchair assistance?", "Special assistance inquiry"),
+        ("What is the terminal for my flight?", "Terminal inquiry"),
+        ("Can I bring a stroller?", "Stroller inquiry"),
+        ("Do you offer bassinet seats?", "Bassinet inquiry"),
     ]
 
-    for i, (query, context) in enumerate(test_queries):
-        import time
+    for i, (query, context_desc) in enumerate(test_queries):
+        from uuid import uuid4
 
-        trace_id = f"comprehensive_{i}_{int(time.time() * 1000)}"
+        trace_id = uuid4().hex
         logger.info(f"\n--- Query {i + 1}: {query} ---")
         logger.info(f"Trace ID: {trace_id}")
+
+        span = None
+        if langfuse:
+            # Create a root span for this interaction in Langfuse
+            try:
+                # Note: v3 SDK uses start_span or similar. The client object might expose different methods
+                # depending on initialization. We'll use a safe pattern.
+                # If we were using the high-level SDK we might use decorators, but here we are manual.
+
+                # We'll just rely on the trace_id linkage for now, as shown in api.py
+                # But to make the trace appear nicely, we can create a span if possible.
+                # Since api.py does `langfuse_client.start_span`, we will do similar if supported.
+                if hasattr(langfuse, "start_span"):
+                    span = langfuse.start_span(
+                        name="mcp_eval_demo",
+                        trace_context={"trace_id": trace_id},
+                        input=query,
+                        metadata={"description": context_desc},
+                    )
+            except Exception as e:
+                logger.warning(f"Could not start Langfuse span: {e}")
 
         try:
             # Start tracking trace for ALL agents to ensure context propagation
@@ -397,6 +484,13 @@ async def demo_comprehensive_evaluation():
 
             agent_response = result.final_output
 
+            if span:
+                try:
+                    span.update(output=agent_response)
+                    span.end()
+                except Exception as e:
+                    logger.warning(f"Could not end Langfuse span: {e}")
+
             logger.info(f"\n1. Agent Response:")
             logger.info(f"   {agent_response[:200]}...")
 
@@ -409,18 +503,23 @@ async def demo_comprehensive_evaluation():
             logger.info(f"   Total Calls: {mcp_eval['total_calls']}")
 
             if langfuse:
-                llm_eval = await evaluate_response(
+                from ..services.evaluators import evaluate_and_score_trace
+
+                llm_eval = await evaluate_and_score_trace(
+                    trace_id=trace_id,
                     user_message=query,
-                    assistant_message=agent_response,
+                    assistant_messages=[agent_response],
                     agent_name=triage_agent.name,
                     langfuse_client=langfuse,
                 )
-                logger.info(f"\n3. LLM-as-a-Judge Evaluation:")
-                logger.info(f"   Helpfulness: {llm_eval.helpfulness:.2f}")
-                logger.info(f"   Accuracy: {llm_eval.accuracy:.2f}")
-                logger.info(f"   Relevance: {llm_eval.relevance:.2f}")
-                logger.info(f"   Overall Score: {llm_eval.overall_score:.2f}")
-                logger.info(f"   Reasoning: {llm_eval.reasoning}")
+
+                if llm_eval:
+                    logger.info(f"\n3. LLM-as-a-Judge Evaluation:")
+                    logger.info(f"   Helpfulness: {llm_eval.helpfulness:.2f}")
+                    logger.info(f"   Accuracy: {llm_eval.accuracy:.2f}")
+                    logger.info(f"   Relevance: {llm_eval.relevance:.2f}")
+                    logger.info(f"   Overall Score: {llm_eval.overall_score:.2f}")
+                    logger.info(f"   Reasoning: {llm_eval.reasoning}")
 
                 langfuse.flush()
 

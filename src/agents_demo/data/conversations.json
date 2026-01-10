@@ -4503,5 +4503,24 @@
     "feedback": [],
     "updated_at": 1767956316.770731,
     "created_at": 1767956287.6421523
+  },
+  "1d117057973b48b2834bfd26becb689d": {
+    "input_items": [],
+    "context": {
+      "passenger_name": null,
+      "confirmation_number": null,
+      "seat_number": null,
+      "flight_number": null,
+      "account_number": "14997249",
+      "meal_preference": null,
+      "dietary_restrictions": null,
+      "special_requests": null,
+      "meal_status": "not_requested"
+    },
+    "current_agent": "Triage Agent",
+    "trace_history": [],
+    "feedback": [],
+    "updated_at": 1768043827.5120642,
+    "created_at": 1768043827.5120642
   }
 }
